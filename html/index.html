@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<title>抽奖</title>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+		}
+
+		.container {
+			margin: 50px auto;
+			width: 300px;
+			height: 200px;
+		}
+
+		h2 {
+			text-align: center;
+		}
+
+		span {
+			display: inline-block;
+		}
+
+		#list {
+			margin-top: 20px;
+			width: 298px;
+			height: 40px;
+			text-align: center;
+			font-size: 20px;
+			font-weight: bold;
+			color: red;
+			line-height: 40px;
+		}
+
+		#start {
+			margin-left: 90px;
+		}
+
+		#start,
+		#stop {
+			margin-top: 30px;
+			margin-right: 10px;
+			text-align: center;
+			width: 50px;
+			height: 30px;
+			background: rgb(0, 51, 102);
+			text-align: center;
+			line-height: 30px;
+			cursor: pointer;
+			color: #fff;
+			border-radius: 6px;
+		}
+
+		.decription {
+			width: 350px;
+			height: 200px;
+			margin: 100px auto;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<h2>开始抽奖了</h2>
+		<span id="list">马上开奖</span>
+		<span id="start">开始</span>
+		<span id="stop">停止</span>
+	</div>
+	<div class="decription">
+		<p>说明：鼠标或者键盘回车键控制抽奖或者结束</p>
+	</div>
+
+	<script type="text/javascript">
+		var list = document.getElementById('list'),
+			start = document.getElementById('start'),
+			stop = document.getElementById('stop');
+		var arr = ["苹果笔记本", "小米6", "nubia Z17", "ipod", "ipad mini2", "iPhone 8", "谢谢惠顾", "50元代金券", "1000元代金券", "iPhone X"];
+		var timer = null;
+		var flag = 0;
+
+		window.onload = function () {
+			start.onclick = playFun;
+			stop.onclick = stopFun;
+
+			document.onkeyup = keyupEvent;
+
+		}
+
+		//键盘事件
+		function keyupEvent(e) {
+			e = e || window.event;
+			if (flag == 0) {
+				if (e.keyCode == 13) {
+					playFun();
+					flag = 1;
+				}
+			} else {
+				stopFun();
+				flag = 0;
+			}
+		}
+
+		//鼠标点击事件
+		function playFun() {
+			clearInterval(timer);
+			timer = setInterval(function () {
+				var random = Math.floor(Math.random() * arr.length);
+				list.innerText = arr[random];
+			}, 50);
+			start.style.background = 'rgb(153, 153, 153)';
+		}
+
+		function stopFun() {
+			clearInterval(timer);
+			start.style.background = 'rgb(0, 51, 102)';
+		}
+	</script>
+</body>
+
+</html>
