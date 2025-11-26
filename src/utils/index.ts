@@ -1,8 +1,17 @@
 import { exec } from 'child_process'
 import { createHash } from 'crypto'
+import { Request } from 'express'
 import * as Log4js from 'log4js'
 
-const cmd = { pmt: '' }
+export function fetchIP(req: Request) {
+  let xForwarded = req.headers['x-real-ip'] as string
+  if (!xForwarded) {
+    xForwarded =
+      (req.headers['x-forwarded-for'] as string) || (req.ip as string)
+  }
+  const arr = xForwarded.split(':')
+  return arr[arr.length - 1] || ''
+}
 
 export function execSync(
   cmd: string,
@@ -26,26 +35,19 @@ export async function checkSystem(
   logInfo?: Log4js.Logger,
   logError?: Log4js.Logger
 ) {
-  if (cmd.pmt) return cmd
   const id = await execSync('id -u', logInfo, logError)
-  if (id !== '0') return '请以ROOT身份执行'
+  if (id !== '0') throw new Error('请以ROOT身份执行')
   const systemctl = await execSync(
     'which systemctl 2>/dev/null',
     logInfo,
     logError
   )
-  if (!systemctl) return '系统版本过低'
+  if (!systemctl) throw new Error('系统版本过低')
   const yum = await execSync('which yum 2>/dev/null', logInfo, logError)
-  if (yum) {
-    cmd.pmt = 'yum'
-    return cmd
-  }
+  if (yum) return 'yum'
   const apt = await execSync('which apt 2>/dev/null', logInfo, logError)
-  if (apt) {
-    cmd.pmt = 'apt'
-    return cmd
-  }
-  return '不受支持的Linux系统'
+  if (apt) return 'apt'
+  throw new Error('不受支持的Linux系统')
 }
 
 export function sleep(ms = 2000) {

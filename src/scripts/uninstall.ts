@@ -3,15 +3,12 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { ServerEntity } from 'src/entities/server.entity'
 import { statusEnum } from 'src/enums'
-import { execSync } from 'src/utils'
+import { checkSystem, execSync } from 'src/utils'
 import { DataSource } from 'typeorm'
 import * as Log4js from 'log4js'
 import { trojanPath } from 'src/utils/trojan'
 
 dotenv.config({ path: ['.env'] })
-
-const id = process.argv[1]
-const pmt = process.argv[2]
 
 const orm = new DataSource({
   type: 'mysql',
@@ -25,14 +22,19 @@ const orm = new DataSource({
 })
 
 async function main() {
+  const ip = await execSync('curl -sL -4 ip.sb')
+  if (!ip) return
   const db = await orm.initialize()
-  const entity = await db.manager.findOneBy(ServerEntity, { id: Number(id) })
+  const entity = await db.manager.findOneBy(ServerEntity, {
+    ip: ip,
+    enable: 1
+  })
   if (!entity) return
   Log4js.configure({
     appenders: {
       app: {
         type: 'dateFile',
-        filename: `logs/uninstall/${entity.domain}.log`
+        filename: `logs/${entity.domain}-uninstall.log`
       }
     },
     categories: {
@@ -43,6 +45,7 @@ async function main() {
     }
   })
   const logger = Log4js.getLogger('app')
+  const pmt = await checkSystem(logger, logger)
   const domain = await execSync(
     `grep sni ${trojanPath.configFile} | cut -d\" -f4`,
     logger,

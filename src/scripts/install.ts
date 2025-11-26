@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv'
 import { join } from 'path'
 import { ServerEntity } from 'src/entities/server.entity'
-import { createTrojanPwd, execSync, sleep } from 'src/utils'
+import { checkSystem, createTrojanPwd, execSync, sleep } from 'src/utils'
 import { DataSource } from 'typeorm'
 import * as Log4js from 'log4js'
 import { bbrReboot, configNginx, configTrojan } from 'src/utils/trojan'
@@ -12,9 +12,6 @@ import { UserEntity } from 'src/entities/user.entity'
 import { statusEnum } from 'src/enums'
 
 dotenv.config({ path: ['.env'] })
-
-const id = process.argv[1]
-const pmt = process.argv[2]
 
 const orm = new DataSource({
   type: 'mysql',
@@ -28,14 +25,19 @@ const orm = new DataSource({
 })
 
 async function main() {
+  const ip = await execSync('curl -sL -4 ip.sb')
+  if (!ip) return
   const db = await orm.initialize()
-  const entity = await db.manager.findOneBy(ServerEntity, { id: Number(id) })
+  const entity = await db.manager.findOneBy(ServerEntity, {
+    ip: ip,
+    enable: 1
+  })
   if (!entity) return
   Log4js.configure({
     appenders: {
       app: {
         type: 'dateFile',
-        filename: `logs/install/${entity.domain}.log`
+        filename: `logs/${entity.domain}-install.log`
       }
     },
     categories: {
@@ -46,6 +48,7 @@ async function main() {
     }
   })
   const logger = Log4js.getLogger('app')
+  const pmt = await checkSystem(logger, logger)
   await execSync(`${pmt} clean all`, logger, logger)
   if (pmt === 'apt') {
     await execSync(`${pmt} update`, logger, logger)
@@ -70,7 +73,7 @@ async function main() {
   // 设置防火墙
   await setFirewall(entity.port, logger, logger)
   // 获取证书
-  await obtainCertificate(!!bt, pmt, entity.domain, logger, logger)
+  if (!bt) await obtainCertificate(pmt, entity.domain, logger, logger)
   // 配置 nginx
   await configNginx(!!bt, entity.domain, logger, logger)
   // 下载 trojan 文件
@@ -83,7 +86,7 @@ async function main() {
   })
   const pwds = users.map(e => createTrojanPwd(e.username))
   // 配置 trojan
-  await configTrojan(entity.port, entity.domain, pwds, logger, logger)
+  await configTrojan(!!bt, entity.port, entity.domain, pwds, logger, logger)
   if (entity.bbr) {
     await installBBR(pmt, logger, logger)
   }
@@ -112,6 +115,7 @@ async function main() {
         logger.error(` >> ${user.username} pwd add fail`)
       }
     }
+    entity.startTime = new Date()
   }
   entity.status = status
   await db.manager.save(entity)

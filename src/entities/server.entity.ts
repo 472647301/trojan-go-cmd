@@ -18,7 +18,7 @@ export class ServerEntity {
 
   @Column('int', {
     name: 'ip_limit',
-    comment: '在线IP数量',
+    comment: '最大IP限制',
     default: () => '0'
   })
   ipLimit: number

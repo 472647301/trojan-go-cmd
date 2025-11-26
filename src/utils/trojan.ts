@@ -1,13 +1,10 @@
 import { statusEnum } from 'src/enums'
 import * as Log4js from 'log4js'
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, writeFileSync } from 'fs'
 import { execSync, sleep } from '.'
 import { join } from 'path'
-import {
-  nginxConfText,
-  nginxServerConfText,
-  trojanConfigJson
-} from 'src/config'
+import { nginxConfText, trojanConfigJson } from 'src/config'
+import { nginxServerConfText } from 'src/config'
 
 export const trojanPath = {
   /** 主目录 */
@@ -74,7 +71,7 @@ export async function installNginx(
   if (bt) {
     const nginx = await execSync('which nginx 2>/dev/null', logInfo, logError)
     if (!nginx) {
-      throw new Error('>> nginx is not installed in BT Panel')
+      throw new Error('>> nginx is not installed in bt panel')
     }
     return
   }
@@ -106,7 +103,7 @@ export async function installNginx(
   await execSync('systemctl enable nginx', logInfo, logError)
 }
 
-// 获取防火墙
+// 设置防火墙
 export async function setFirewall(
   port: number,
   logInfo?: Log4js.Logger,
@@ -214,7 +211,6 @@ export async function setFirewall(
 
 // 获取证书
 export async function obtainCertificate(
-  bt: boolean,
   pmt: string,
   domain: string,
   logInfo?: Log4js.Logger,
@@ -247,19 +243,11 @@ export async function obtainCertificate(
     logInfo,
     logError
   )
-  if (bt) {
-    await execSync(
-      `~/.acme.sh/acme.sh --issue -d ${domain} --keylength ec-256 --pre-hook "nginx -s stop || { echo -n ''; }" --post-hook "nginx -c /www/server/nginx/conf/nginx.conf || { echo -n ''; }" --standalone`,
-      logInfo,
-      logError
-    )
-  } else {
-    await execSync(
-      `~/.acme.sh/acme.sh --issue -d ${domain} --keylength ec-256 --pre-hook "systemctl stop nginx" --post-hook "systemctl restart nginx" --standalone`,
-      logInfo,
-      logError
-    )
-  }
+  await execSync(
+    `~/.acme.sh/acme.sh --issue -d ${domain} --keylength ec-256 --pre-hook "systemctl stop nginx" --post-hook "systemctl restart nginx" --standalone`,
+    logInfo,
+    logError
+  )
   if (!existsSync(`~/.acme.sh/${domain}_ecc/ca.cer`)) {
     throw new Error('>> certificate acquisition failed(1)')
   }
@@ -286,7 +274,11 @@ export async function configNginx(
   logInfo?: Log4js.Logger,
   logError?: Log4js.Logger
 ) {
-  if (!bt) {
+  if (bt) {
+    if (!existsSync(`/www/server/panel/vhost/nginx/${domain}.conf`)) {
+      throw new Error(`please add ${domain} to the bt panel and enable ssl`)
+    }
+  } else {
     if (!existsSync('/etc/nginx/nginx.conf.bak')) {
       await execSync(
         'mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak',
@@ -310,7 +302,6 @@ export async function configNginx(
     writeFileSync(join(trojanPath.nginxConf, `${domain}.conf`), serverText, {
       encoding: 'utf-8'
     })
-    return
   }
 }
 
@@ -395,6 +386,7 @@ export async function installTrojan(
 
 // 配置 trojan
 export async function configTrojan(
+  bt: boolean,
   port: number,
   domain: string,
   passwords: string[],
@@ -406,10 +398,22 @@ export async function configTrojan(
     JSON.stringify(trojanConfigJson)
   )
   config.local_port = port
-  config.password = passwords
-  config.ssl.key = `${trojanPath.root}/${domain}.key`
-  config.ssl.cert = `${trojanPath.root}/${domain}.pem`
+  config.password = ['123456AAaa'].concat(passwords)
   config.ssl.sni = domain
+  if (bt) {
+    // /www/server/panel/vhost/cert/ota.byronzhu.cn/fullchain.pem
+    if (!existsSync(`/www/server/panel/vhost/cert/${domain}/fullchain.pem`)) {
+      throw new Error(
+        `please configure the ${domain} certificate in the bt panel`
+      )
+    }
+    config.ssl.key = `/www/server/panel/vhost/cert/${domain}/privkey.pem`
+    config.ssl.cert = `/www/server/panel/vhost/cert/${domain}/fullchain.pem`
+  } else {
+    config.ssl.key = `${trojanPath.root}/${domain}.key`
+    config.ssl.cert = `${trojanPath.root}/${domain}.pem`
+  }
+
   writeFileSync(trojanPath.configFile, JSON.stringify(config, null, '\t'), {
     encoding: 'utf-8'
   })

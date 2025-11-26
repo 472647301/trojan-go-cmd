@@ -33,7 +33,7 @@ export class UserEntity {
 
   @Column('int', {
     name: 'ip_limit',
-    comment: '在线IP数量',
+    comment: '最大IP限制',
     default: () => '0'
   })
   ipLimit: number
@@ -65,6 +65,20 @@ export class UserEntity {
     default: () => '0'
   })
   downloadSpeed: number
+
+  @Column('int', {
+    name: 'upload_limit',
+    comment: '上传限速',
+    default: () => '0'
+  })
+  uploadLimit: number
+
+  @Column('int', {
+    name: 'download_limit',
+    comment: '下载限速',
+    default: () => '0'
+  })
+  downloadLimit: number
 
   @Column('tinyint', {
     name: 'enable',
