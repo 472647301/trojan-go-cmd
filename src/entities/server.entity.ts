@@ -72,7 +72,7 @@ export class ServerEntity {
   type: number
 
   @Column('tinyint', {
-    name: 'enable',
+    name: 'bbr',
     comment: '0-禁用、1-启用',
     default: () => '1'
   })
