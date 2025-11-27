@@ -13,7 +13,7 @@ export class TrojanUserDto {
 }
 
 export class TrojanLimitDto {
-  @IsNumber()
+  @IsString()
   @IsNotEmpty()
   ip: number
 
