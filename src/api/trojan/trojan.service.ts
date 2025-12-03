@@ -138,7 +138,6 @@ export class TrojanService {
       if (res !== 'Done') {
         return apiUtil.error(res)
       }
-      await this.tUserServer.remove(userServer)
       return apiUtil.data({ id: userServer.id })
     }
     if (body.action === UserAction.add) {
