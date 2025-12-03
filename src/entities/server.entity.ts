@@ -1,8 +1,9 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm'
 import { UpdateDateColumn, CreateDateColumn } from 'typeorm'
+import { UserServer } from './user.server.entity'
 
 @Entity('servers')
-export class ServerEntity {
+export class Server {
   @PrimaryGeneratedColumn({
     type: 'int',
     name: 'id'
@@ -40,13 +41,14 @@ export class ServerEntity {
   @Column('varchar', {
     name: 'ip',
     comment: 'IP',
+    unique: true,
     length: 255
   })
   ip: string
 
   @Column('int', {
     name: 'port',
-    comment: '端口'
+    comment: 'TROJAN启动端口'
   })
   port: number
 
@@ -103,4 +105,7 @@ export class ServerEntity {
     comment: '更新时间'
   })
   updateTime: Date
+
+  @OneToMany(() => UserServer, userServer => userServer.server)
+  userServers: UserServer[]
 }

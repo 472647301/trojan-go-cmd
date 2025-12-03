@@ -1,15 +1,15 @@
 import * as dotenv from 'dotenv'
 import { join } from 'path'
-import { ServerEntity } from 'src/entities/server.entity'
-import { checkSystem, createTrojanPwd, execSync, sleep } from 'src/utils'
+import { Server } from 'src/entities/server.entity'
+import { checkSystem, execSync, sleep } from 'src/utils'
 import { DataSource } from 'typeorm'
 import * as Log4js from 'log4js'
 import { bbrReboot, configNginx, configTrojan } from 'src/utils/trojan'
 import { downloadTrojan, installBBR, installNginx } from 'src/utils/trojan'
 import { installTrojan, obtainCertificate, setFirewall } from 'src/utils/trojan'
 import { startNginx, stopNginx, trojanGoStatus } from 'src/utils/trojan'
-import { UserEntity } from 'src/entities/user.entity'
 import { statusEnum } from 'src/enums'
+import { UserServer } from 'src/entities/user.server.entity'
 
 dotenv.config({ path: ['.env'] })
 
@@ -28,7 +28,7 @@ async function main() {
   const ip = await execSync('curl -sL -4 ip.sb')
   if (!ip) return
   const db = await orm.initialize()
-  const entity = await db.manager.findOneBy(ServerEntity, {
+  const entity = await db.manager.findOneBy(Server, {
     ip: ip,
     enable: 1
   })
@@ -80,11 +80,10 @@ async function main() {
   await downloadTrojan(logger, logger)
   // 安装 trojan
   await installTrojan(logger, logger)
-  const users = await db.manager.findBy(UserEntity, {
-    serverId: entity.id,
-    enable: 1
+  const userServerList = await db.manager.findBy(UserServer, {
+    serverId: entity.id
   })
-  const pwds = users.map(e => createTrojanPwd(e.username))
+  const pwds = userServerList.map(e => e.password)
   // 配置 trojan
   await configTrojan(!!bt, entity.port, entity.domain, pwds, logger, logger)
   if (entity.bbr) {
@@ -97,22 +96,28 @@ async function main() {
   const status = await trojanGoStatus(logger, logger)
   if (status === statusEnum.Started) {
     for (const pwd of pwds) {
-      const user = users.find(u => {
-        const uPwd = createTrojanPwd(u.username)
-        return uPwd === pwd
+      const userServer = userServerList.find(u => {
+        return u.password === pwd
       })
-      if (!user) continue
-      const info = await execSync(
-        `trojan-go -api get -target-password ${pwd}`,
-        logger,
-        logger
-      )
+      if (!userServer) continue
       try {
-        const json = JSON.parse(info) as { user: { hash: string } }
-        user.serverHash = json.user.hash
-        await this.tUser.save(user)
+        const info = await execSync(
+          `trojan-go -api get -target-password ${pwd}`,
+          logger,
+          logger
+        )
+        const item = JSON.parse(info) as ItemT
+        userServer.hash = item.user.hash
+        userServer.ipLimit = item.status.ip_limit
+        userServer.uploadTraffic = item.status.traffic_total.upload_traffic
+        userServer.downloadTraffic = item.status.traffic_total.download_traffic
+        userServer.downloadSpeed = item.status.speed_current.download_speed
+        userServer.uploadSpeed = item.status.speed_current.upload_speed
+        userServer.downloadLimit = item.status.speed_limit.download_speed
+        userServer.uploadLimit = item.status.speed_limit.upload_speed
+        await this.tUserServer.save(userServer)
       } catch (e) {
-        logger.error(` >> ${user.username} pwd add fail`)
+        logger.error(` >> ${userServer.password} add fail`)
       }
     }
     entity.startTime = new Date()
@@ -127,3 +132,22 @@ async function main() {
 main().finally(() => {
   process.exit()
 })
+
+interface ItemT {
+  user: { hash: string }
+  status: {
+    traffic_total: {
+      upload_traffic: number
+      download_traffic: number
+    }
+    speed_current: {
+      upload_speed: number
+      download_speed: number
+    }
+    speed_limit: {
+      upload_speed: number
+      download_speed: number
+    }
+    ip_limit: number
+  }
+}

@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv'
 import { existsSync } from 'fs'
 import { join } from 'path'
-import { ServerEntity } from 'src/entities/server.entity'
+import { Server } from 'src/entities/server.entity'
 import { statusEnum } from 'src/enums'
 import { checkSystem, execSync } from 'src/utils'
 import { DataSource } from 'typeorm'
@@ -25,7 +25,7 @@ async function main() {
   const ip = await execSync('curl -sL -4 ip.sb')
   if (!ip) return
   const db = await orm.initialize()
-  const entity = await db.manager.findOneBy(ServerEntity, {
+  const entity = await db.manager.findOneBy(Server, {
     ip: ip,
     enable: 1
   })

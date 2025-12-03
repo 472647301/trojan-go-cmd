@@ -1,12 +1,12 @@
 import * as dotenv from 'dotenv'
 import { join } from 'path'
-import { ServerEntity } from 'src/entities/server.entity'
-import { createTrojanPwd, execSync } from 'src/utils'
+import { Server } from 'src/entities/server.entity'
+import { execSync } from 'src/utils'
 import { DataSource } from 'typeorm'
 import * as Log4js from 'log4js'
-import { UserEntity } from 'src/entities/user.entity'
 import { statusEnum } from 'src/enums'
 import { trojanGoStatus } from 'src/utils/trojan'
+import { UserServer } from 'src/entities/user.server.entity'
 
 dotenv.config({ path: ['.env'] })
 
@@ -25,7 +25,7 @@ async function main() {
   const ip = await execSync('curl -sL -4 ip.sb')
   if (!ip) return
   const db = await orm.initialize()
-  const entity = await db.manager.findOneBy(ServerEntity, {
+  const entity = await db.manager.findOneBy(Server, {
     ip: ip,
     enable: 1,
     status: statusEnum.Started
@@ -48,9 +48,8 @@ async function main() {
   const logger = Log4js.getLogger('app')
   const status = await trojanGoStatus(logger, logger)
   if (status !== statusEnum.Started) return
-  const users = await db.manager.findBy(UserEntity, {
-    serverId: entity.id,
-    enable: 1
+  const userServerList = await db.manager.findBy(UserServer, {
+    serverId: entity.id
   })
   const text = await execSync(
     'trojan-go -api-addr 127.0.0.1:10000 -api list',
@@ -61,28 +60,22 @@ async function main() {
   let uploadTraffic = 0
   let downloadTraffic = 0
   const list = JSON.parse(text) as ItemT[]
-  const userHash: Record<string, number> = {}
-  for (const user of users) {
-    const pwd = createTrojanPwd(user.username)
-    userHash[pwd] = user.id
-  }
   for (const item of list) {
     ipLimit += item.status.ip_limit
     uploadTraffic += item.status.traffic_total.upload_traffic
     downloadTraffic += item.status.traffic_total.download_traffic
-    if (!userHash[item.user.hash]) continue
-    const user = users.find(e => {
-      return e.id === userHash[item.user.hash]
+    const userServer = userServerList.find(e => {
+      return e.hash === item.user.hash
     })
-    if (!user) continue
-    user.ipLimit = item.status.ip_limit
-    user.uploadTraffic = item.status.traffic_total.upload_traffic
-    user.downloadTraffic = item.status.traffic_total.download_traffic
-    user.downloadSpeed = item.status.speed_current.download_speed
-    user.uploadSpeed = item.status.speed_current.upload_speed
-    user.downloadLimit = item.status.speed_limit.download_speed
-    user.uploadLimit = item.status.speed_limit.upload_speed
-    await db.manager.save(user)
+    if (!userServer) continue
+    userServer.ipLimit = item.status.ip_limit
+    userServer.uploadTraffic = item.status.traffic_total.upload_traffic
+    userServer.downloadTraffic = item.status.traffic_total.download_traffic
+    userServer.downloadSpeed = item.status.speed_current.download_speed
+    userServer.uploadSpeed = item.status.speed_current.upload_speed
+    userServer.downloadLimit = item.status.speed_limit.download_speed
+    userServer.uploadLimit = item.status.speed_limit.upload_speed
+    await db.manager.save(userServer)
   }
   entity.ipLimit = ipLimit
   entity.uploadTraffic = uploadTraffic

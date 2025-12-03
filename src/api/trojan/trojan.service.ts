@@ -2,23 +2,23 @@ import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { exec } from 'child_process'
 import { join } from 'path'
-import { ServerEntity } from 'src/entities/server.entity'
-import { UserEntity } from 'src/entities/user.entity'
+import { Server } from 'src/entities/server.entity'
 import { statusEnum, statusText } from 'src/enums'
-import { createTrojanPwd, execSync, sleep } from 'src/utils'
+import { execSync, sleep } from 'src/utils'
 import { apiUtil } from 'src/utils/api'
 import { Logs } from 'src/utils/logger'
 import { trojanGoStatus } from 'src/utils/trojan'
 import { Repository } from 'typeorm'
 import { TrojanLimitDto, TrojanUserDto, UserAction } from './trojan.dto'
+import { UserServer } from 'src/entities/user.server.entity'
 
 @Injectable()
 export class TrojanService {
   constructor(
-    @InjectRepository(UserEntity)
-    private readonly tUser: Repository<UserEntity>,
-    @InjectRepository(ServerEntity)
-    private readonly tServer: Repository<ServerEntity>
+    @InjectRepository(UserServer)
+    private readonly tUserServer: Repository<UserServer>,
+    @InjectRepository(Server)
+    private readonly tServer: Repository<Server>
   ) {}
 
   async install() {
@@ -117,93 +117,73 @@ export class TrojanService {
   }
 
   async user(id: string, body: TrojanUserDto) {
-    const user = await this.tUser.findOneBy({
-      id: Number(id)
+    const userServer = await this.tUserServer.findOne({
+      where: { id: Number(id) },
+      relations: { server: true }
     })
-    if (!user) return apiUtil.error('用户不存在')
-    if (!user.enable) return apiUtil.error('用户被禁用')
-    const entity = await this.tServer.findOneBy({
-      id: user.serverId
-    })
-    if (!entity) return apiUtil.error('资源不存在')
-    if (entity.status !== statusEnum.Started) {
-      return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
+    if (!userServer) return apiUtil.error('资源不存在')
+    if (userServer.server.status !== statusEnum.Started) {
+      return apiUtil.error(`当前服务器-${statusText[userServer.server.status]}`)
     }
     const trojanStatus = await trojanGoStatus(Logs.app, Logs.err)
     if (trojanStatus !== statusEnum.Started) {
-      return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
+      return apiUtil.error(`当前服务器-${statusText[userServer.server.status]}`)
     }
-    const pwd = createTrojanPwd(user.username)
     if (body.action === UserAction.del) {
       const res = await execSync(
-        `trojan-go -api set -delete-profile -target-password ${pwd}`,
+        `trojan-go -api set -delete-profile -target-password ${userServer.password}`,
         Logs.app,
         Logs.err
       )
       if (res !== 'Done') {
         return apiUtil.error(res)
       }
-      user.serverHash = null
-      await this.tUser.save(user)
-      return apiUtil.data({ id: user.id })
+      await this.tUserServer.remove(userServer)
+      return apiUtil.data({ id: userServer.id })
     }
-
     if (body.action === UserAction.add) {
       const res = await execSync(
-        `trojan-go -api set -add-profile -target-password ${pwd}`,
+        `trojan-go -api set -add-profile -target-password ${userServer.password}`,
         Logs.app,
         Logs.err
       )
       if (res !== 'Done') {
         return apiUtil.error(res)
       }
-      const info = await execSync(
-        `trojan-go -api get -target-password ${pwd}`,
-        Logs.app,
-        Logs.err
-      )
-      const item = JSON.parse(info) as ItemT
-      user.serverHash = item.user.hash
-      user.ipLimit = item.status.ip_limit
-      user.uploadTraffic = item.status.traffic_total.upload_traffic
-      user.downloadTraffic = item.status.traffic_total.download_traffic
-      user.downloadSpeed = item.status.speed_current.download_speed
-      user.uploadSpeed = item.status.speed_current.upload_speed
-      user.downloadLimit = item.status.speed_limit.download_speed
-      user.uploadLimit = item.status.speed_limit.upload_speed
-      await this.tUser.save(user)
-      return apiUtil.data({ id: user.id })
     }
-
     const info = await execSync(
-      `trojan-go -api get -target-password ${pwd}`,
+      `trojan-go -api get -target-password ${userServer.password}`,
       Logs.app,
       Logs.err
     )
-    const json = JSON.parse(info)
-    return apiUtil.data({ id: user.id, ...json })
+    const item = JSON.parse(info) as ItemT
+    userServer.hash = item.user.hash
+    userServer.ipLimit = item.status.ip_limit
+    userServer.uploadTraffic = item.status.traffic_total.upload_traffic
+    userServer.downloadTraffic = item.status.traffic_total.download_traffic
+    userServer.downloadSpeed = item.status.speed_current.download_speed
+    userServer.uploadSpeed = item.status.speed_current.upload_speed
+    userServer.downloadLimit = item.status.speed_limit.download_speed
+    userServer.uploadLimit = item.status.speed_limit.upload_speed
+    await this.tUserServer.save(userServer)
+    return apiUtil.data({ id: userServer.id })
   }
 
   async limit(id: string, body: TrojanLimitDto) {
-    const user = await this.tUser.findOneBy({
-      id: Number(id)
+    const userServer = await this.tUserServer.findOne({
+      where: { id: Number(id) },
+      relations: { server: true }
     })
-    if (!user) return apiUtil.error('用户不存在')
-    if (!user.enable) return apiUtil.error('用户被禁用')
-    const entity = await this.tServer.findOneBy({
-      id: user.serverId
-    })
-    if (!entity) return apiUtil.error('资源不存在')
-    if (entity.status !== statusEnum.Started) {
-      return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
+    if (!userServer) return apiUtil.error('资源不存在')
+    if (userServer.server.status !== statusEnum.Started) {
+      return apiUtil.error(`当前服务器-${statusText[userServer.server.status]}`)
     }
     const trojanStatus = await trojanGoStatus(Logs.app, Logs.err)
     if (trojanStatus !== statusEnum.Started) {
-      return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
+      return apiUtil.error(`当前服务器-${statusText[userServer.server.status]}`)
     }
-    const pwd = createTrojanPwd(user.username)
     const res = await execSync(
-      `trojan-go -api-addr 127.0.0.1:10000 -api set -modify-profile -target-password ${pwd} \
+      `trojan-go -api-addr 127.0.0.1:10000 -api set -modify-profile -target-password ${userServer.password} \
         -ip-limit ${body.ip} \
         -upload-speed-limit ${body.upload} \
         -download-speed-limit ${body.download} \
@@ -211,10 +191,13 @@ export class TrojanService {
       Logs.app,
       Logs.err
     )
-    user.ipLimit = body.ip
-    user.uploadLimit = body.upload
-    user.downloadLimit = body.download
-    return apiUtil.data(res)
+    if (res !== 'Done') {
+      return apiUtil.error(res)
+    }
+    userServer.ipLimit = body.ip
+    userServer.uploadLimit = body.upload
+    userServer.downloadLimit = body.download
+    return apiUtil.data({ id: userServer.id })
   }
 }
 

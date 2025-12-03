@@ -1,5 +1,4 @@
 import { exec } from 'child_process'
-import { createHash } from 'crypto'
 import { Request } from 'express'
 import * as Log4js from 'log4js'
 
@@ -69,8 +68,4 @@ export async function to<T, U = Error>(
       }
       return [err, undefined]
     })
-}
-
-export function createTrojanPwd(username: string) {
-  return createHash('md5').update(username).digest('hex')
 }

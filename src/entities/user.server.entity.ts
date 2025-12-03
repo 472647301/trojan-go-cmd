@@ -1,33 +1,64 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
 import { UpdateDateColumn, CreateDateColumn } from 'typeorm'
+import { ManyToOne, JoinColumn } from 'typeorm'
+import { Server } from './server.entity'
 
-@Entity('users')
-export class UserEntity {
+@Entity('user_servers')
+export class UserServer {
   @PrimaryGeneratedColumn({
     type: 'int',
     name: 'id'
   })
   id: number
 
+  /**
+   * 节点密码
+   * 每次登录会随机生成并移除旧的
+   */
   @Column('varchar', {
-    name: 'username',
-    comment: '用户名',
+    name: 'password',
+    comment: '节点密码',
     length: 255
   })
-  username: string
+  password: string
 
   @Column('varchar', {
-    name: 'server_hash',
-    comment: '节点生成的用户密码',
+    name: 'hash',
+    comment: '节点HASH密码',
     nullable: true,
     length: 255
   })
-  serverHash: string | null
+  hash: string | null
+
+  @Column('varchar', {
+    name: 'domain',
+    comment: '域名',
+    length: 255
+  })
+  domain: string
+
+  @Column('int', {
+    name: 'port',
+    comment: '端口'
+  })
+  port: number
+
+  @Column('varchar', {
+    name: 'platform',
+    comment: '平台标识',
+    length: 255
+  })
+  platform: string
+
+  @Column('int', {
+    name: 'user_id',
+    comment: '用户ID'
+  })
+  userId: number
 
   @Column('int', {
     name: 'server_id',
-    comment: '节点ID',
-    default: () => '0'
+    comment: '服务器ID'
   })
   serverId: number
 
@@ -80,13 +111,6 @@ export class UserEntity {
   })
   downloadLimit: number
 
-  @Column('tinyint', {
-    name: 'enable',
-    comment: '0-禁用、1-启用',
-    default: () => '1'
-  })
-  enable: number
-
   @CreateDateColumn({
     name: 'create_time',
     comment: '创建时间'
@@ -98,4 +122,8 @@ export class UserEntity {
     comment: '更新时间'
   })
   updateTime: Date
+
+  @ManyToOne(() => Server, server => server.userServers)
+  @JoinColumn({ name: 'server_id' })
+  server: Server
 }
