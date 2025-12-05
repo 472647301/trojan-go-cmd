@@ -5,6 +5,7 @@ import { LogModule } from './api/log/log.module'
 import { ScheduleModule } from '@nestjs/schedule'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { join } from 'path'
+import { DatabaseLogger } from './utils/logger'
 
 @Module({
   imports: [
@@ -23,11 +24,11 @@ import { join } from 'path'
         password: configService.get('ORM_PASSWORD'),
         database: configService.get('ORM_DATABASE'),
         entities: [join(__dirname, './entities', '*.{ts,js}')],
+        logger: new DatabaseLogger(),
         synchronize: false
       }),
       inject: [ConfigService]
     }),
-
     TrojanModule,
     LogModule
   ],
