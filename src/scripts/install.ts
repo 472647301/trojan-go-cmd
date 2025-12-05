@@ -1,5 +1,5 @@
 import { Server } from 'src/entities/server.entity'
-import { checkSystem, execSync, logError, logInfo, sleep } from 'src/utils'
+import { checkSystem, execSync, logError, sleep } from 'src/utils'
 import { bbrReboot, configNginx, configTrojan } from 'src/utils/trojan'
 import { downloadTrojan, installBBR, installNginx } from 'src/utils/trojan'
 import { installTrojan, obtainCertificate, setFirewall } from 'src/utils/trojan'
@@ -38,52 +38,48 @@ async function main() {
     logError('资源不存在')
     return
   }
-  const pmt = await checkSystem(logInfo, logError)
-  await execSync(`${pmt} clean all`, logInfo, logError)
+  const pmt = await checkSystem()
+  await execSync(`${pmt} clean all`)
   if (pmt === 'apt') {
-    await execSync(`${pmt} update`, logInfo, logError)
+    await execSync(`${pmt} update`)
   }
-  await execSync(
-    `${pmt} install -y wget vim unzip tar gcc openssl`,
-    logInfo,
-    logError
-  )
-  await execSync(`${pmt} install -y net-tools`, logInfo, logError)
+  await execSync(`${pmt} install -y wget vim unzip tar gcc openssl`)
+  await execSync(`${pmt} install -y net-tools`)
   if (pmt === 'apt') {
-    await execSync(`${pmt} libssl-dev g++`, logInfo, logError)
+    await execSync(`${pmt} libssl-dev g++`)
   }
-  const unzip = await execSync('which unzip 2>/dev/null', logInfo, logError)
+  const unzip = await execSync('which unzip 2>/dev/null')
   if (unzip.indexOf('unzip') === -1) {
     logError('Install unzip error')
     return
   }
-  const bt = await execSync('which bt 2>/dev/null', logInfo, logError)
+  const bt = await execSync('which bt 2>/dev/null')
   // 安装nginx
-  await installNginx(!!bt, pmt, logInfo, logError)
+  await installNginx(!!bt, pmt)
   // 设置防火墙
-  await setFirewall(entity.port, logInfo, logError)
+  await setFirewall(entity.port)
   // 获取证书
-  if (!bt) await obtainCertificate(pmt, entity.domain, logInfo, logError)
+  if (!bt) await obtainCertificate(pmt, entity.domain)
   // 配置 nginx
-  await configNginx(!!bt, entity.domain, logInfo, logError)
+  await configNginx(!!bt, entity.domain)
   // 下载 trojan 文件
-  await downloadTrojan(logInfo, logError)
+  await downloadTrojan()
   // 安装 trojan
-  await installTrojan(logInfo, logError)
+  await installTrojan()
   const userServerList = await db.manager.findBy(UserServer, {
     serverId: entity.id
   })
   const pwds = userServerList.map(e => e.password)
   // 配置 trojan
-  await configTrojan(!!bt, entity.port, entity.domain, pwds, logInfo, logError)
+  await configTrojan(!!bt, entity.port, entity.domain, pwds)
   if (entity.bbr) {
-    await installBBR(pmt, logInfo, logError)
+    await installBBR(pmt)
   }
-  await stopNginx(!!bt, logInfo, logError)
-  await startNginx(!!bt, logInfo, logError)
-  await execSync('systemctl restart trojan-go', logInfo, logError)
+  await stopNginx(!!bt)
+  await startNginx(!!bt)
+  await execSync('systemctl restart trojan-go')
   await sleep()
-  const status = await trojanGoStatus(logInfo, logError)
+  const status = await trojanGoStatus()
   if (status === statusEnum.Started) {
     for (const pwd of pwds) {
       const userServer = userServerList.find(u => {
@@ -92,9 +88,7 @@ async function main() {
       if (!userServer) continue
       try {
         const info = await execSync(
-          `trojan-go -api get -target-password ${pwd}`,
-          logInfo,
-          logError
+          `trojan-go -api get -target-password ${pwd}`
         )
         const item = JSON.parse(info) as ItemT
         userServer.hash = item.user.hash
@@ -115,7 +109,7 @@ async function main() {
   entity.status = status
   await db.manager.save(entity)
   if (entity.bbr) {
-    await bbrReboot(logInfo, logError)
+    await bbrReboot()
   }
 }
 

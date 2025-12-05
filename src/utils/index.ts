@@ -14,19 +14,15 @@ export function fetchIP(req: Request) {
   return arr[arr.length - 1] || ''
 }
 
-export function execSync(
-  cmd: string,
-  logInfo?: (message: any, ...args: any[]) => void,
-  logError?: (message: any, ...args: any[]) => void
-): Promise<string> {
+export function execSync(cmd: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    logInfo?.(`cmd: ${cmd}`)
+    logInfo(`cmd: ${cmd}`)
     exec(cmd, (error, stdout, stderr) => {
       if (error || stderr) {
         reject(error?.message || stderr)
-        logError?.(cmd, error?.message || stderr)
+        logError(cmd, error?.message || stderr)
       } else {
-        logInfo?.(`cmd: ${cmd} ${stdout.trim()}`)
+        logInfo(`cmd: ${cmd} ${stdout.trim()}`)
         resolve(stdout.trim())
       }
     })
@@ -37,17 +33,13 @@ export async function checkSystem(
   logInfo?: (message: any, ...args: any[]) => void,
   logError?: (message: any, ...args: any[]) => void
 ) {
-  const id = await execSync('id -u', logInfo, logError)
+  const id = await execSync('id -u')
   if (id !== '0') throw new Error('请以ROOT身份执行')
-  const systemctl = await execSync(
-    'which systemctl 2>/dev/null',
-    logInfo,
-    logError
-  )
+  const systemctl = await execSync('which systemctl 2>/dev/null')
   if (!systemctl) throw new Error('系统版本过低')
-  const yum = await execSync('which yum 2>/dev/null', logInfo, logError)
+  const yum = await execSync('which yum 2>/dev/null')
   if (yum) return 'yum'
-  const apt = await execSync('which apt 2>/dev/null', logInfo, logError)
+  const apt = await execSync('which apt 2>/dev/null')
   if (apt) return 'apt'
   throw new Error('不受支持的Linux系统')
 }

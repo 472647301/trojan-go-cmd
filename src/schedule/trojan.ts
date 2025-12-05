@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
-import { exec } from 'child_process'
 import { join } from 'path'
 import { runScriptAndLogSpawn } from 'src/utils'
 

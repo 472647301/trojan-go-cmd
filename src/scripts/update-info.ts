@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv'
 import { join } from 'path'
 import { Server } from 'src/entities/server.entity'
-import { execSync, logError, logInfo } from 'src/utils'
+import { execSync, logError } from 'src/utils'
 import { DataSource } from 'typeorm'
 import { statusEnum } from 'src/enums'
 import { trojanGoStatus } from 'src/utils/trojan'
@@ -36,16 +36,12 @@ async function main() {
     logError('资源不存在')
     return
   }
-  const status = await trojanGoStatus(logInfo, logError)
+  const status = await trojanGoStatus()
   if (status !== statusEnum.Started) return
   const userServerList = await db.manager.findBy(UserServer, {
     serverId: entity.id
   })
-  const text = await execSync(
-    'trojan-go -api-addr 127.0.0.1:10000 -api list',
-    logInfo,
-    logError
-  )
+  const text = await execSync('trojan-go -api-addr 127.0.0.1:10000 -api list')
   let ipLimit = 0
   let uploadTraffic = 0
   let downloadTraffic = 0

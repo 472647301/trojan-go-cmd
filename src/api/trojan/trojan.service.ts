@@ -1,12 +1,10 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { exec } from 'child_process'
 import { join } from 'path'
 import { Server } from 'src/entities/server.entity'
 import { statusEnum, statusText } from 'src/enums'
 import { execSync, runScriptAndLogSpawn, sleep } from 'src/utils'
 import { apiUtil } from 'src/utils/api'
-import { Logs } from 'src/utils/logger'
 import { trojanGoStatus } from 'src/utils/trojan'
 import { Repository } from 'typeorm'
 import { TrojanLimitDto, TrojanUserDto, UserAction } from './trojan.dto'
@@ -22,11 +20,7 @@ export class TrojanService {
   ) {}
 
   async install() {
-    const ip = await execSync(
-      'curl -sL -4 ip.sb',
-      Logs.app.info,
-      Logs.err.error
-    )
+    const ip = await execSync('curl -sL -4 ip.sb')
     if (!ip) return apiUtil.error('本机IP获取失败')
     const entity = await this.tServer.findOneBy({
       ip: ip,
@@ -51,11 +45,7 @@ export class TrojanService {
   }
 
   async uninstall() {
-    const ip = await execSync(
-      'curl -sL -4 ip.sb',
-      Logs.app.info,
-      Logs.err.error
-    )
+    const ip = await execSync('curl -sL -4 ip.sb')
     if (!ip) return apiUtil.error('本机IP获取失败')
     const entity = await this.tServer.findOneBy({
       ip: ip,
@@ -78,11 +68,7 @@ export class TrojanService {
   }
 
   async start() {
-    const ip = await execSync(
-      'curl -sL -4 ip.sb',
-      Logs.app.info,
-      Logs.err.error
-    )
+    const ip = await execSync('curl -sL -4 ip.sb')
     if (!ip) return apiUtil.error('本机IP获取失败')
     const entity = await this.tServer.findOneBy({
       ip: ip,
@@ -92,13 +78,13 @@ export class TrojanService {
     if (entity.status !== statusEnum.NotStarted) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
-    const trojanStatus = await trojanGoStatus(Logs.app.info, Logs.err.error)
+    const trojanStatus = await trojanGoStatus()
     if (trojanStatus !== statusEnum.NotStarted) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
-    await execSync('systemctl restart trojan-go', Logs.app.info, Logs.err.error)
+    await execSync('systemctl restart trojan-go')
     await sleep()
-    const res = await trojanGoStatus(Logs.app.info, Logs.err.error)
+    const res = await trojanGoStatus()
     if (res !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
@@ -111,11 +97,7 @@ export class TrojanService {
   }
 
   async stop() {
-    const ip = await execSync(
-      'curl -sL -4 ip.sb',
-      Logs.app.info,
-      Logs.err.error
-    )
+    const ip = await execSync('curl -sL -4 ip.sb')
     if (!ip) return apiUtil.error('本机IP获取失败')
     const entity = await this.tServer.findOneBy({
       ip: ip,
@@ -125,11 +107,11 @@ export class TrojanService {
     if (entity.status !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
-    const trojanStatus = await trojanGoStatus(Logs.app.info, Logs.err.error)
+    const trojanStatus = await trojanGoStatus()
     if (trojanStatus !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
-    await execSync('systemctl stop trojan-go', Logs.app.info, Logs.err.error)
+    await execSync('systemctl stop trojan-go')
     entity.status = statusEnum.NotStarted
     await this.tServer.save(entity)
     return apiUtil.data({
@@ -147,15 +129,13 @@ export class TrojanService {
     if (userServer.server.status !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[userServer.server.status]}`)
     }
-    const trojanStatus = await trojanGoStatus(Logs.app.info, Logs.err.error)
+    const trojanStatus = await trojanGoStatus()
     if (trojanStatus !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[userServer.server.status]}`)
     }
     if (body.action === UserAction.del) {
       const res = await execSync(
-        `trojan-go -api set -delete-profile -target-password ${userServer.password}`,
-        Logs.app.info,
-        Logs.err.error
+        `trojan-go -api set -delete-profile -target-password ${userServer.password}`
       )
       if (res !== 'Done') {
         return apiUtil.error(res)
@@ -164,18 +144,14 @@ export class TrojanService {
     }
     if (body.action === UserAction.add) {
       const res = await execSync(
-        `trojan-go -api set -add-profile -target-password ${userServer.password}`,
-        Logs.app.info,
-        Logs.err.error
+        `trojan-go -api set -add-profile -target-password ${userServer.password}`
       )
       if (res !== 'Done') {
         return apiUtil.error(res)
       }
     }
     const info = await execSync(
-      `trojan-go -api get -target-password ${userServer.password}`,
-      Logs.app.info,
-      Logs.err.error
+      `trojan-go -api get -target-password ${userServer.password}`
     )
     const item = JSON.parse(info) as ItemT
     userServer.hash = item.user.hash
@@ -199,7 +175,7 @@ export class TrojanService {
     if (userServer.server.status !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[userServer.server.status]}`)
     }
-    const trojanStatus = await trojanGoStatus(Logs.app.info, Logs.err.error)
+    const trojanStatus = await trojanGoStatus()
     if (trojanStatus !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[userServer.server.status]}`)
     }
@@ -208,9 +184,7 @@ export class TrojanService {
         -ip-limit ${body.ip} \
         -upload-speed-limit ${body.upload} \
         -download-speed-limit ${body.download} \
-      `,
-      Logs.app.info,
-      Logs.err.error
+      `
     )
     if (res !== 'Done') {
       return apiUtil.error(res)
