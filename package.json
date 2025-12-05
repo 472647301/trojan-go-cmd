@@ -21,7 +21,7 @@
     "typeorm:gen": "rm -rf ./src/migrations/*.ts && npx typeorm-ts-node-commonjs migration:generate ./src/migrations/init -d ./src/typeorm.ts",
     "typeorm:run": "npx typeorm-ts-node-commonjs migration:run -d ./src/typeorm.ts",
     "pm2:start": "nest build && pm2 start dist/main.js --name trojan -o logs/log.log -e logs/err.log",
-    "pm2:restart": "nest build && pm2 delete trojan && npm run pm2:start"
+    "pm2:restart": "pm2 delete trojan && npm run pm2:start"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
