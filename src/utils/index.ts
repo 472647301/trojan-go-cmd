@@ -29,17 +29,14 @@ export function execSync(cmd: string): Promise<string> {
   })
 }
 
-export async function checkSystem(
-  logInfo?: (message: any, ...args: any[]) => void,
-  logError?: (message: any, ...args: any[]) => void
-) {
+export async function checkSystem() {
   const id = await execSync('id -u')
   if (id !== '0') throw new Error('请以ROOT身份执行')
-  const systemctl = await execSync('which systemctl 2>/dev/null')
+  const [, systemctl] = await to(execSync('which systemctl 2>/dev/null'))
   if (!systemctl) throw new Error('系统版本过低')
-  const yum = await execSync('which yum 2>/dev/null')
+  const [, yum] = await to(execSync('which yum 2>/dev/null'))
   if (yum) return 'yum'
-  const apt = await execSync('which apt 2>/dev/null')
+  const [, apt] = await to(execSync('which apt 2>/dev/null'))
   if (apt) return 'apt'
   throw new Error('不受支持的Linux系统')
 }

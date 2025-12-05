@@ -1,5 +1,5 @@
 import { Server } from 'src/entities/server.entity'
-import { checkSystem, execSync, logError, sleep } from 'src/utils'
+import { checkSystem, execSync, logError, sleep, to } from 'src/utils'
 import { bbrReboot, configNginx, configTrojan } from 'src/utils/trojan'
 import { downloadTrojan, installBBR, installNginx } from 'src/utils/trojan'
 import { installTrojan, obtainCertificate, setFirewall } from 'src/utils/trojan'
@@ -48,12 +48,12 @@ async function main() {
   if (pmt === 'apt') {
     await execSync(`${pmt} libssl-dev g++`)
   }
-  const unzip = await execSync('which unzip 2>/dev/null')
-  if (unzip.indexOf('unzip') === -1) {
+  const [, unzip] = await to(execSync('which unzip 2>/dev/null'))
+  if (unzip?.indexOf('unzip') === -1) {
     logError('Install unzip error')
     return
   }
-  const bt = await execSync('which bt 2>/dev/null')
+  const [, bt] = await to(execSync('which bt 2>/dev/null'))
   // 安装nginx
   await installNginx(!!bt, pmt)
   // 设置防火墙

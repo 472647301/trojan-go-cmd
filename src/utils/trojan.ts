@@ -2,7 +2,7 @@ import { statusEnum } from 'src/enums'
 import { existsSync, writeFileSync } from 'fs'
 import { nginxConfText, trojanConfigJson } from 'src/config'
 import { nginxServerConfText } from 'src/config'
-import { execSync, logInfo, sleep } from '.'
+import { execSync, logInfo, sleep, to } from '.'
 import { join } from 'path'
 
 export const trojanPath = {
@@ -38,7 +38,7 @@ export async function trojanGoStatus(): Promise<statusEnum> {
 
 export async function installNginx(bt: boolean, pmt: string) {
   if (bt) {
-    const nginx = await execSync('which nginx 2>/dev/null')
+    const [, nginx] = await to(execSync('which nginx 2>/dev/null'))
     if (!nginx) {
       throw new Error('>> nginx is not installed in bt panel')
     }
@@ -68,7 +68,7 @@ export async function installNginx(bt: boolean, pmt: string) {
 
 // 设置防火墙
 export async function setFirewall(port: number) {
-  const firewallCmd = await execSync('which firewall-cmd 2>/dev/null')
+  const [, firewallCmd] = await to(execSync('which firewall-cmd 2>/dev/null'))
   if (firewallCmd) {
     const firewalld = await execSync(
       'systemctl status firewalld > /dev/null 2>&1'
@@ -94,7 +94,7 @@ export async function setFirewall(port: number) {
     }
     return
   }
-  const iptables = await execSync('which iptables 2>/dev/null')
+  const [, iptables] = await to(execSync('which iptables 2>/dev/null'))
   if (iptables) {
     await execSync('iptables -I INPUT -p tcp --dport 80 -j ACCEPT')
     await execSync('iptables -I INPUT -p tcp --dport 443 -j ACCEPT')
@@ -103,7 +103,7 @@ export async function setFirewall(port: number) {
     }
     return
   }
-  const ufw = await execSync('which ufw 2>/dev/null')
+  const [, ufw] = await to(execSync('which ufw 2>/dev/null'))
   if (ufw) {
     const ufwStatus = await execSync('ufw status | grep -i inactive')
     if (!ufwStatus) {

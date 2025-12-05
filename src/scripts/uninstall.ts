@@ -3,7 +3,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { Server } from 'src/entities/server.entity'
 import { statusEnum } from 'src/enums'
-import { checkSystem, execSync, logError } from 'src/utils'
+import { checkSystem, execSync, logError, to } from 'src/utils'
 import { DataSource } from 'typeorm'
 import { trojanPath } from 'src/utils/trojan'
 
@@ -44,7 +44,7 @@ async function main() {
   await execSync('rm -rf /usr/bin/trojan-go')
   await execSync('systemctl disable trojan-go')
   await execSync('rm -rf /etc/systemd/system/trojan-go.service')
-  const bt = await execSync('which bt 2>/dev/null')
+  const [, bt] = await to(execSync('which bt 2>/dev/null'))
   if (bt) {
     await execSync(`rm -rf ${trojanPath.btNginx}${domain}.conf`)
   } else {
