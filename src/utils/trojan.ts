@@ -45,10 +45,11 @@ export async function installNginx(bt: boolean, pmt: string) {
     return
   }
   if (pmt === 'yum') {
-    const epel = await execSync(`${pmt} install -y epel-release`)
+    const [, epel] = await to(execSync(`${pmt} install -y epel-release`))
     if (epel) {
-      execSync(
-        `echo '[nginx-stable]
+      to(
+        execSync(
+          `echo '[nginx-stable]
             name=nginx stable repo
             baseurl=http://nginx.org/packages/centos/$releasever/$basearch/
             gpgcheck=1
@@ -56,6 +57,7 @@ export async function installNginx(bt: boolean, pmt: string) {
             gpgkey=https://nginx.org/keys/nginx_signing.key
             module_hotfixes=true' > /etc/yum.repos.d/nginx.repo
           `
+        )
       )
     }
   }
@@ -70,7 +72,7 @@ export async function installNginx(bt: boolean, pmt: string) {
 export async function setFirewall(port: number) {
   const [, firewallCmd] = await to(execSync('which firewall-cmd 2>/dev/null'))
   if (firewallCmd) {
-    const firewalld = await to(
+    const [, firewalld] = await to(
       execSync('systemctl status firewalld > /dev/null 2>&1')
     )
     if (firewalld) {

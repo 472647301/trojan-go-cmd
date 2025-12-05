@@ -1,3 +1,5 @@
+#!/bin/bash
+
 import { Server } from 'src/entities/server.entity'
 import { checkSystem, execSync, logError, sleep, to } from 'src/utils'
 import { bbrReboot, configNginx, configTrojan } from 'src/utils/trojan'

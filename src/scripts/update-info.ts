@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv'
 import { join } from 'path'
 import { Server } from 'src/entities/server.entity'
-import { execSync, logError } from 'src/utils'
+import { execSync, logError, to } from 'src/utils'
 import { DataSource } from 'typeorm'
 import { statusEnum } from 'src/enums'
 import { trojanGoStatus } from 'src/utils/trojan'
@@ -41,7 +41,13 @@ async function main() {
   const userServerList = await db.manager.findBy(UserServer, {
     serverId: entity.id
   })
-  const text = await execSync('trojan-go -api-addr 127.0.0.1:10000 -api list')
+  const [, text] = await to(
+    execSync('trojan-go -api-addr 127.0.0.1:10000 -api list')
+  )
+  if (!text) {
+    logError('用户列表读取失败')
+    return
+  }
   let ipLimit = 0
   let uploadTraffic = 0
   let downloadTraffic = 0

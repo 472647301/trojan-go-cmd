@@ -89,7 +89,8 @@ export function runScriptAndLogSpawn(scriptPath: string, logName: string) {
   logInfo(`Spawning child process and redirecting output to log files...`)
   const child = spawn(process.argv[0], [scriptPath], {
     // Pipes stdin to parent, stdout to stdoutLog FD, stderr to stderrLog FD
-    stdio: ['inherit', stdoutLog, stderrLog]
+    stdio: ['inherit', stdoutLog, stderrLog],
+    env: process.env
   })
 
   child.on('error', err => {
