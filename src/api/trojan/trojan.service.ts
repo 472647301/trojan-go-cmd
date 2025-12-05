@@ -33,7 +33,7 @@ export class TrojanService {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
     runScriptAndLogSpawn(
-      join(__dirname, '../scripts/install.js'),
+      join(__dirname, '../../scripts/install.js'),
       `install-${entity.domain.replaceAll('.', '-')}`
     )
     entity.status = statusEnum.InstallationInProgress
@@ -56,7 +56,7 @@ export class TrojanService {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
     runScriptAndLogSpawn(
-      join(__dirname, '../scripts/uninstall.js'),
+      join(__dirname, '../../scripts/uninstall.js'),
       `uninstall-${entity.domain.replaceAll('.', '-')}`
     )
     entity.status = statusEnum.Uninstalling
