@@ -59,7 +59,7 @@ export async function installNginx(bt: boolean, pmt: string) {
       )
     }
   }
-  const nginx = await execSync(`${pmt} install -y nginx`)
+  const nginx = await to(execSync(`${pmt} install -y nginx`))
   if (!nginx) {
     throw new Error('>> nginx installation failed')
   }
@@ -70,47 +70,47 @@ export async function installNginx(bt: boolean, pmt: string) {
 export async function setFirewall(port: number) {
   const [, firewallCmd] = await to(execSync('which firewall-cmd 2>/dev/null'))
   if (firewallCmd) {
-    const firewalld = await execSync(
-      'systemctl status firewalld > /dev/null 2>&1'
+    const firewalld = await to(
+      execSync('systemctl status firewalld > /dev/null 2>&1')
     )
     if (firewalld) {
-      await execSync('firewall-cmd --permanent --add-service=http')
-      await execSync('firewall-cmd --permanent --add-service=https')
+      await to(execSync('firewall-cmd --permanent --add-service=http'))
+      await to(execSync('firewall-cmd --permanent --add-service=https'))
       if (port !== 443) {
-        await execSync(`firewall-cmd --permanent --add-port=${port}/tcp`)
+        await to(execSync(`firewall-cmd --permanent --add-port=${port}/tcp`))
       }
-      await execSync('firewall-cmd --reload')
+      await to(execSync('firewall-cmd --reload'))
       return
     }
-    const nl = await execSync(
-      `iptables -nL | nl | grep FORWARD | awk '{print $1}'`
+    const [, nl] = await to(
+      execSync(`iptables -nL | nl | grep FORWARD | awk '{print $1}'`)
     )
     if (nl !== '3') {
-      await execSync('iptables -I INPUT -p tcp --dport 80 -j ACCEPT')
-      await execSync('iptables -I INPUT -p tcp --dport 443 -j ACCEPT')
+      await to(execSync('iptables -I INPUT -p tcp --dport 80 -j ACCEPT'))
+      await to(execSync('iptables -I INPUT -p tcp --dport 443 -j ACCEPT'))
       if (port !== 443) {
-        await execSync(`iptables -I INPUT -p tcp --dport ${port} -j ACCEPT`)
+        await to(execSync(`iptables -I INPUT -p tcp --dport ${port} -j ACCEPT`))
       }
     }
     return
   }
   const [, iptables] = await to(execSync('which iptables 2>/dev/null'))
   if (iptables) {
-    await execSync('iptables -I INPUT -p tcp --dport 80 -j ACCEPT')
-    await execSync('iptables -I INPUT -p tcp --dport 443 -j ACCEPT')
+    await to(execSync('iptables -I INPUT -p tcp --dport 80 -j ACCEPT'))
+    await to(execSync('iptables -I INPUT -p tcp --dport 443 -j ACCEPT'))
     if (port !== 443) {
-      await execSync(`iptables -I INPUT -p tcp --dport ${port} -j ACCEPT`)
+      await to(execSync(`iptables -I INPUT -p tcp --dport ${port} -j ACCEPT`))
     }
     return
   }
   const [, ufw] = await to(execSync('which ufw 2>/dev/null'))
   if (ufw) {
-    const ufwStatus = await execSync('ufw status | grep -i inactive')
+    const [, ufwStatus] = await to(execSync('ufw status | grep -i inactive'))
     if (!ufwStatus) {
-      await execSync('ufw allow http/tcp')
-      await execSync('ufw allow https/tcp')
+      await to(execSync('ufw allow http/tcp'))
+      await to(execSync('ufw allow https/tcp'))
       if (port !== 443) {
-        await execSync(`ufw allow ${port}/tcp`)
+        await to(execSync(`ufw allow ${port}/tcp`))
       }
     }
   }
@@ -118,37 +118,43 @@ export async function setFirewall(port: number) {
 
 // 获取证书
 export async function obtainCertificate(pmt: string, domain: string) {
-  await execSync(`mkdir -p ${trojanPath.root}`)
-  await execSync(`${pmt} install -y socat openssl`)
+  await to(execSync(`mkdir -p ${trojanPath.root}`))
+  await to(execSync(`${pmt} install -y socat openssl`))
   if (pmt === 'yum') {
-    await execSync(`${pmt} install -y cronie`)
-    await execSync('systemctl start crond')
-    await execSync('systemctl enable crond')
+    await to(execSync(`${pmt} install -y cronie`))
+    await to(execSync('systemctl start crond'))
+    await to(execSync('systemctl enable crond'))
   } else {
-    await execSync(`${pmt} install -y cron`)
-    await execSync('systemctl start cron')
-    await execSync('systemctl enable cron')
+    await to(execSync(`${pmt} install -y cron`))
+    await to(execSync('systemctl start cron'))
+    await to(execSync('systemctl enable cron'))
   }
-  await execSync(
-    'curl -sL https://get.acme.sh | sh -s email=byron.zhuwenbo@gmail.com'
+  await to(
+    execSync(
+      'curl -sL https://get.acme.sh | sh -s email=byron.zhuwenbo@gmail.com'
+    )
   )
-  await execSync('source ~/.bashrc')
-  await execSync('~/.acme.sh/acme.sh  --upgrade  --auto-upgrade')
-  await execSync('~/.acme.sh/acme.sh --set-default-ca --server letsencrypt')
-  await execSync(
-    `~/.acme.sh/acme.sh --issue -d ${domain} --keylength ec-256 --pre-hook "systemctl stop nginx" --post-hook "systemctl restart nginx" --standalone`
+  await to(execSync('source ~/.bashrc'))
+  await to(execSync('~/.acme.sh/acme.sh  --upgrade  --auto-upgrade'))
+  await to(execSync('~/.acme.sh/acme.sh --set-default-ca --server letsencrypt'))
+  await to(
+    execSync(
+      `~/.acme.sh/acme.sh --issue -d ${domain} --keylength ec-256 --pre-hook "systemctl stop nginx" --post-hook "systemctl restart nginx" --standalone`
+    )
   )
   if (!existsSync(`~/.acme.sh/${domain}_ecc/ca.cer`)) {
     throw new Error('>> certificate acquisition failed(1)')
   }
   const pemPath = `${trojanPath.root}/${domain}.pem`
   const keyPath = `${trojanPath.root}/${domain}.key`
-  await execSync(
-    `~/.acme.sh/acme.sh  --install-cert -d $DOMAIN --ecc \
+  await to(
+    execSync(
+      `~/.acme.sh/acme.sh  --install-cert -d $DOMAIN --ecc \
       --key-file       ${keyPath}  \
       --fullchain-file ${pemPath} \
       --reloadcmd     "service nginx force-reload"
       `
+    )
   )
   if (!existsSync(pemPath) || !existsSync(keyPath)) {
     throw new Error('>> certificate acquisition failed(2)')
@@ -163,9 +169,9 @@ export async function configNginx(bt: boolean, domain: string) {
     }
   } else {
     if (!existsSync('/etc/nginx/nginx.conf.bak')) {
-      await execSync('mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak')
+      await to(execSync('mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak'))
     }
-    const res = await execSync('id nginx 2>/dev/null')
+    const [, res] = await to(execSync('id nginx 2>/dev/null'))
     let nginxText = nginxConfText()
     nginxText = nginxText.replace(
       '{{user}}',
@@ -206,15 +212,18 @@ export async function archAffix() {
 
 // 下载文件
 export async function downloadTrojan() {
-  const ver = await execSync(
-    `curl -fsSL https://api.github.com/repos/p4gefau1t/trojan-go/releases | grep tag_name | sed -E 's/.*"v(.*)".*/\\1/' | head -n1`
+  const [, ver] = await to(
+    execSync(
+      `curl -fsSL https://api.github.com/repos/p4gefau1t/trojan-go/releases | grep tag_name | sed -E 's/.*"v(.*)".*/\\1/' | head -n1`
+    )
   )
+  if (!ver) throw new Error('installation file download failed')
   const suffix = await archAffix()
   if (!suffix) {
     throw new Error('unsupported systems')
   }
   const url = `https://github.com/p4gefau1t/trojan-go/releases/download/v${ver}/trojan-go-linux-${suffix}.zip`
-  await execSync(`wget -O /tmp/${trojanPath.zipFile}.zip ${url}`)
+  await to(execSync(`wget -O /tmp/${trojanPath.zipFile}.zip ${url}`))
   if (!existsSync(`/tmp/${trojanPath.zipFile}.zip`)) {
     throw new Error('installation file download failed')
   }
@@ -222,20 +231,24 @@ export async function downloadTrojan() {
 
 // 安装文件
 export async function installTrojan() {
-  await execSync(`rm -rf /tmp/${trojanPath.zipFile}`)
-  await execSync(
-    `unzip /tmp/${trojanPath.zipFile}.zip -d /tmp/${trojanPath.zipFile}`
+  await to(execSync(`rm -rf /tmp/${trojanPath.zipFile}`))
+  await to(
+    execSync(
+      `unzip /tmp/${trojanPath.zipFile}.zip -d /tmp/${trojanPath.zipFile}`
+    )
   )
-  await execSync(`cp /tmp/${trojanPath.zipFile}/trojan-go /usr/bin`)
-  await execSync(
-    `cp /tmp/${trojanPath.zipFile}/example/trojan-go.service /etc/systemd/system/`
+  await to(execSync(`cp /tmp/${trojanPath.zipFile}/trojan-go /usr/bin`))
+  await to(
+    execSync(
+      `cp /tmp/${trojanPath.zipFile}/example/trojan-go.service /etc/systemd/system/`
+    )
   )
-  await execSync(
-    `sed -i '/User=nobody/d' /etc/systemd/system/trojan-go.service`
+  await to(
+    execSync(`sed -i '/User=nobody/d' /etc/systemd/system/trojan-go.service`)
   )
-  await execSync(`systemctl daemon-reload`)
-  await execSync(`systemctl enable trojan-go`)
-  await execSync(`rm -rf /tmp/${trojanPath.zipFile}`)
+  await to(execSync(`systemctl daemon-reload`))
+  await to(execSync(`systemctl enable trojan-go`))
+  await to(execSync(`rm -rf /tmp/${trojanPath.zipFile}`))
 }
 
 // 配置 trojan
@@ -245,7 +258,7 @@ export async function configTrojan(
   domain: string,
   passwords: string[]
 ) {
-  await execSync(`mkdir -p ${trojanPath.root}`)
+  await to(execSync(`mkdir -p ${trojanPath.root}`))
   const config: typeof trojanConfigJson = JSON.parse(
     JSON.stringify(trojanConfigJson)
   )
@@ -271,45 +284,53 @@ export async function configTrojan(
   })
 
   if (existsSync('/etc/selinux/config')) {
-    const [err] = await execSync(`grep 'SELINUX=enforcing' /etc/selinux/config`)
+    const [err] = await to(
+      execSync(`grep 'SELINUX=enforcing' /etc/selinux/config`)
+    )
     if (err) return
     // 将系统的 SELinux（安全增强型 Linux）状态从“强制模式 (Enforcing)” 切换为 “宽容模式 (Permissive)”
-    await execSync(
-      `sed -i 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config`
+    await to(
+      execSync(
+        `sed -i 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config`
+      )
     )
-    await execSync(`setenforce 0`)
+    await to(execSync(`setenforce 0`))
   }
 }
 
 // 安装 BBR
 export async function installBBR(pmt: string) {
-  const bbr = await execSync(`lsmod | grep bbr`)
+  const [, bbr] = await to(execSync(`lsmod | grep bbr`))
   if (bbr) return
-  const openvz = await execSync(`hostnamectl | grep -i openvz`)
+  const [, openvz] = await to(execSync(`hostnamectl | grep -i openvz`))
   // openvz机器，跳过安装
   if (openvz) return
-  await execSync(`echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf`)
-  await execSync(
-    `echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf`
+  await to(execSync(`echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf`))
+  await to(
+    execSync(`echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf`)
   )
-  await execSync(`sysctl -p`)
-  const _bbr = await execSync(`lsmod | grep bbr`)
+  await to(execSync(`sysctl -p`))
+  const _bbr = await to(execSync(`lsmod | grep bbr`))
   if (_bbr) return
   if (pmt === 'yum') {
-    await execSync(`rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org`)
-    await execSync(
-      `rpm -Uvh http://www.elrepo.org/elrepo-release-7.0-4.el7.elrepo.noarch.rpm`
+    await to(
+      execSync(`rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org`)
     )
-    await execSync(`${pmt} install -y --enablerepo=elrepo-kernel kernel-ml`)
-    await execSync(`${pmt} remove -y kernel-3.*`)
-    await execSync(`grub2-set-default 0`)
-    await execSync(`echo "tcp_bbr" >> /etc/modules-load.d/modules.conf`)
+    await to(
+      execSync(
+        `rpm -Uvh http://www.elrepo.org/elrepo-release-7.0-4.el7.elrepo.noarch.rpm`
+      )
+    )
+    await to(execSync(`${pmt} install -y --enablerepo=elrepo-kernel kernel-ml`))
+    await to(execSync(`${pmt} remove -y kernel-3.*`))
+    await to(execSync(`grub2-set-default 0`))
+    await to(execSync(`echo "tcp_bbr" >> /etc/modules-load.d/modules.conf`))
   } else {
-    await execSync(
-      `${pmt} install -y --install-recommends linux-generic-hwe-16.04`
+    await to(
+      execSync(`${pmt} install -y --install-recommends linux-generic-hwe-16.04`)
     )
-    await execSync(`grub-set-default 0`)
-    await execSync(`echo "tcp_bbr" >> /etc/modules-load.d/modules.conf`)
+    await to(execSync(`grub-set-default 0`))
+    await to(execSync(`echo "tcp_bbr" >> /etc/modules-load.d/modules.conf`))
   }
 }
 
@@ -317,5 +338,5 @@ export async function bbrReboot() {
   // 为使BBR模块生效，系统将在30秒后重启
   logInfo('System will restart in 30 seconds for the BBR module to take effect')
   await sleep(30000)
-  await execSync('reboot')
+  await to(execSync('reboot'))
 }
