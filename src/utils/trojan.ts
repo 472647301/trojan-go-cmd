@@ -63,7 +63,7 @@ export async function installNginx(bt: boolean, pmt: string) {
   if (!nginx) {
     throw new Error('>> nginx installation failed')
   }
-  await execSync('systemctl enable nginx')
+  await to(execSync('systemctl enable nginx'))
 }
 
 // 设置防火墙
