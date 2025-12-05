@@ -24,6 +24,7 @@ export function execSync(
         reject(error?.message || stderr)
         logError?.error(cmd, error?.message || stderr)
       } else {
+        logInfo?.info(`cmd: ${cmd} ${stdout}`)
         resolve(stdout)
       }
     })
