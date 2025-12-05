@@ -1,10 +1,9 @@
 import { statusEnum } from 'src/enums'
-import * as Log4js from 'log4js'
 import { existsSync, writeFileSync } from 'fs'
-import { execSync, sleep } from '.'
-import { join } from 'path'
 import { nginxConfText, trojanConfigJson } from 'src/config'
 import { nginxServerConfText } from 'src/config'
+import { execSync, sleep } from '.'
+import { join } from 'path'
 
 export const trojanPath = {
   /** 主目录 */
@@ -20,8 +19,8 @@ export const trojanPath = {
 
 export async function startNginx(
   bt: boolean,
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ) {
   await execSync(
     bt ? '/etc/init.d/nginx start' : 'systemctl start nginx',
@@ -32,8 +31,8 @@ export async function startNginx(
 
 export async function stopNginx(
   bt: boolean,
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ) {
   await execSync(
     bt ? '/etc/init.d/nginx stop' : 'systemctl stop nginx',
@@ -43,8 +42,8 @@ export async function stopNginx(
 }
 
 export async function trojanGoStatus(
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ): Promise<statusEnum> {
   const tCmd = await execSync('command -v trojan-go', logInfo, logError)
   if (!tCmd) return statusEnum.NotInstalled
@@ -65,8 +64,8 @@ export async function trojanGoStatus(
 export async function installNginx(
   bt: boolean,
   pmt: string,
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ) {
   if (bt) {
     const nginx = await execSync('which nginx 2>/dev/null', logInfo, logError)
@@ -106,8 +105,8 @@ export async function installNginx(
 // 设置防火墙
 export async function setFirewall(
   port: number,
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ) {
   const firewallCmd = await execSync(
     'which firewall-cmd 2>/dev/null',
@@ -213,8 +212,8 @@ export async function setFirewall(
 export async function obtainCertificate(
   pmt: string,
   domain: string,
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ) {
   await execSync(`mkdir -p ${trojanPath.root}`, logInfo, logError)
   await execSync(`${pmt} install -y socat openssl`, logInfo, logError)
@@ -271,8 +270,8 @@ export async function obtainCertificate(
 export async function configNginx(
   bt: boolean,
   domain: string,
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ) {
   if (bt) {
     if (!existsSync(`/www/server/panel/vhost/nginx/${domain}.conf`)) {
@@ -306,8 +305,8 @@ export async function configNginx(
 }
 
 export async function archAffix(
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ) {
   let suffix = ''
   const uname = await execSync('uname -m', logInfo, logError)
@@ -330,8 +329,8 @@ export async function archAffix(
 
 // 下载文件
 export async function downloadTrojan(
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ) {
   const ver = await execSync(
     `curl -fsSL https://api.github.com/repos/p4gefau1t/trojan-go/releases | grep tag_name | sed -E 's/.*"v(.*)".*/\\1/' | head -n1`,
@@ -355,8 +354,8 @@ export async function downloadTrojan(
 
 // 安装文件
 export async function installTrojan(
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ) {
   await execSync(`rm -rf /tmp/${trojanPath.zipFile}`, logInfo, logError)
   await execSync(
@@ -390,8 +389,8 @@ export async function configTrojan(
   port: number,
   domain: string,
   passwords: string[],
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ) {
   await execSync(`mkdir -p ${trojanPath.root}`, logInfo, logError)
   const config: typeof trojanConfigJson = JSON.parse(
@@ -438,8 +437,8 @@ export async function configTrojan(
 // 安装 BBR
 export async function installBBR(
   pmt: string,
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ) {
   const bbr = await execSync(`lsmod | grep bbr`, logInfo, logError)
   if (bbr) return
@@ -502,11 +501,11 @@ export async function installBBR(
 }
 
 export async function bbrReboot(
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ) {
   // 为使BBR模块生效，系统将在30秒后重启
-  logInfo?.info(
+  logInfo?.(
     '>> the system will restart in 30 seconds for the BBR module to take effect'
   )
   await sleep(30000)

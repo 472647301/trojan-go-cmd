@@ -1,6 +1,8 @@
-import { exec } from 'child_process'
+import { exec, spawn } from 'child_process'
+import dayjs from 'dayjs'
 import { Request } from 'express'
-import * as Log4js from 'log4js'
+import { closeSync, openSync } from 'fs'
+import { join } from 'path'
 
 export function fetchIP(req: Request) {
   let xForwarded = req.headers['x-real-ip'] as string
@@ -14,17 +16,17 @@ export function fetchIP(req: Request) {
 
 export function execSync(
   cmd: string,
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    logInfo?.info(`cmd: ${cmd}`)
+    logInfo?.(`cmd: ${cmd}`)
     exec(cmd, (error, stdout, stderr) => {
       if (error || stderr) {
         reject(error?.message || stderr)
-        logError?.error(cmd, error?.message || stderr)
+        logError?.(cmd, error?.message || stderr)
       } else {
-        logInfo?.info(`cmd: ${cmd} ${stdout.trim()}`)
+        logInfo?.(`cmd: ${cmd} ${stdout.trim()}`)
         resolve(stdout.trim())
       }
     })
@@ -32,8 +34,8 @@ export function execSync(
 }
 
 export async function checkSystem(
-  logInfo?: Log4js.Logger,
-  logError?: Log4js.Logger
+  logInfo?: (message: any, ...args: any[]) => void,
+  logError?: (message: any, ...args: any[]) => void
 ) {
   const id = await execSync('id -u', logInfo, logError)
   if (id !== '0') throw new Error('请以ROOT身份执行')
@@ -69,4 +71,46 @@ export async function to<T, U = Error>(
       }
       return [err, undefined]
     })
+}
+
+export function logInfo(message?: any, ...optionalParams: any[]) {
+  console.info(
+    `[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] ${message}`,
+    ...optionalParams
+  )
+}
+
+export function logError(message?: any, ...optionalParams: any[]) {
+  console.error(
+    `[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] ${message}`,
+    ...optionalParams
+  )
+}
+
+export function runScriptAndLogSpawn(scriptPath: string, logName: string) {
+  const stdoutLog = openSync(
+    join(__dirname, `../../logs/${logName}-stdout.log`),
+    'a'
+  ) // 'a' means append
+  const stderrLog = openSync(
+    join(__dirname, `../../logs/${logName}-stderr.log`),
+    'a'
+  )
+
+  logInfo(`Spawning child process and redirecting output to log files...`)
+  const child = spawn(process.argv[0], [scriptPath], {
+    // Pipes stdin to parent, stdout to stdoutLog FD, stderr to stderrLog FD
+    stdio: ['inherit', stdoutLog, stderrLog]
+  })
+
+  child.on('error', err => {
+    logError('Failed to start child process:', err)
+  })
+
+  child.on('close', code => {
+    logInfo(`Child process exited with code ${code}.`)
+    // Close file descriptors when done
+    closeSync(stdoutLog)
+    closeSync(stderrLog)
+  })
 }

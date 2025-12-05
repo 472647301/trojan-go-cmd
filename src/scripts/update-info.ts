@@ -1,9 +1,8 @@
 import * as dotenv from 'dotenv'
 import { join } from 'path'
 import { Server } from 'src/entities/server.entity'
-import { execSync } from 'src/utils'
+import { execSync, logError, logInfo } from 'src/utils'
 import { DataSource } from 'typeorm'
-import * as Log4js from 'log4js'
 import { statusEnum } from 'src/enums'
 import { trojanGoStatus } from 'src/utils/trojan'
 import { UserServer } from 'src/entities/user.server.entity'
@@ -23,38 +22,29 @@ const orm = new DataSource({
 
 async function main() {
   const ip = await execSync('curl -sL -4 ip.sb')
-  if (!ip) return
+  if (!ip) {
+    logError('IP获取失败')
+    return
+  }
   const db = await orm.initialize()
   const entity = await db.manager.findOneBy(Server, {
     ip: ip,
     enable: 1,
     status: statusEnum.Started
   })
-  if (!entity) return
-  Log4js.configure({
-    appenders: {
-      app: {
-        type: 'dateFile',
-        filename: `logs/${entity.domain}-update-info.log`
-      }
-    },
-    categories: {
-      default: {
-        level: 'all',
-        appenders: ['app']
-      }
-    }
-  })
-  const logger = Log4js.getLogger('app')
-  const status = await trojanGoStatus(logger, logger)
+  if (!entity) {
+    logError('资源不存在')
+    return
+  }
+  const status = await trojanGoStatus(logInfo, logError)
   if (status !== statusEnum.Started) return
   const userServerList = await db.manager.findBy(UserServer, {
     serverId: entity.id
   })
   const text = await execSync(
     'trojan-go -api-addr 127.0.0.1:10000 -api list',
-    logger,
-    logger
+    logInfo,
+    logError
   )
   let ipLimit = 0
   let uploadTraffic = 0

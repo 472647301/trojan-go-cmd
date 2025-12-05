@@ -1,15 +1,14 @@
-import * as dotenv from 'dotenv'
-import { join } from 'path'
 import { Server } from 'src/entities/server.entity'
-import { checkSystem, execSync, sleep } from 'src/utils'
-import { DataSource } from 'typeorm'
-import * as Log4js from 'log4js'
+import { checkSystem, execSync, logError, logInfo, sleep } from 'src/utils'
 import { bbrReboot, configNginx, configTrojan } from 'src/utils/trojan'
 import { downloadTrojan, installBBR, installNginx } from 'src/utils/trojan'
 import { installTrojan, obtainCertificate, setFirewall } from 'src/utils/trojan'
 import { startNginx, stopNginx, trojanGoStatus } from 'src/utils/trojan'
-import { statusEnum } from 'src/enums'
 import { UserServer } from 'src/entities/user.server.entity'
+import { statusEnum } from 'src/enums'
+import { DataSource } from 'typeorm'
+import * as dotenv from 'dotenv'
+import { join } from 'path'
 
 dotenv.config({ path: ['.env'] })
 
@@ -26,74 +25,65 @@ const orm = new DataSource({
 
 async function main() {
   const ip = await execSync('curl -sL -4 ip.sb')
-  if (!ip) return
+  if (!ip) {
+    logError('IP获取失败')
+    return
+  }
   const db = await orm.initialize()
   const entity = await db.manager.findOneBy(Server, {
     ip: ip,
     enable: 1
   })
-  if (!entity) return
-  Log4js.configure({
-    appenders: {
-      app: {
-        type: 'dateFile',
-        filename: `logs/${entity.domain}-install.log`
-      }
-    },
-    categories: {
-      default: {
-        level: 'all',
-        appenders: ['app']
-      }
-    }
-  })
-  const logger = Log4js.getLogger('app')
-  const pmt = await checkSystem(logger, logger)
-  await execSync(`${pmt} clean all`, logger, logger)
+  if (!entity) {
+    logError('资源不存在')
+    return
+  }
+  const pmt = await checkSystem(logInfo, logError)
+  await execSync(`${pmt} clean all`, logInfo, logError)
   if (pmt === 'apt') {
-    await execSync(`${pmt} update`, logger, logger)
+    await execSync(`${pmt} update`, logInfo, logError)
   }
   await execSync(
     `${pmt} install -y wget vim unzip tar gcc openssl`,
-    logger,
-    logger
+    logInfo,
+    logError
   )
-  await execSync(`${pmt} install -y net-tools`, logger, logger)
+  await execSync(`${pmt} install -y net-tools`, logInfo, logError)
   if (pmt === 'apt') {
-    await execSync(`${pmt} libssl-dev g++`, logger, logger)
+    await execSync(`${pmt} libssl-dev g++`, logInfo, logError)
   }
-  const unzip = await execSync('which unzip 2>/dev/null', logger, logger)
+  const unzip = await execSync('which unzip 2>/dev/null', logInfo, logError)
   if (unzip.indexOf('unzip') === -1) {
-    logger.error('>> install unzip error')
+    logError('Install unzip error')
     return
   }
-  const bt = await execSync('which bt 2>/dev/null', logger, logger)
+  const bt = await execSync('which bt 2>/dev/null', logInfo, logError)
   // 安装nginx
-  await installNginx(!!bt, pmt, logger, logger)
+  await installNginx(!!bt, pmt, logInfo, logError)
   // 设置防火墙
-  await setFirewall(entity.port, logger, logger)
+  await setFirewall(entity.port, logInfo, logError)
   // 获取证书
-  if (!bt) await obtainCertificate(pmt, entity.domain, logger, logger)
+  if (!bt) await obtainCertificate(pmt, entity.domain, logInfo, logError)
   // 配置 nginx
-  await configNginx(!!bt, entity.domain, logger, logger)
+  await configNginx(!!bt, entity.domain, logInfo, logError)
   // 下载 trojan 文件
-  await downloadTrojan(logger, logger)
+  await downloadTrojan(logInfo, logError)
   // 安装 trojan
-  await installTrojan(logger, logger)
+  await installTrojan(logInfo, logError)
   const userServerList = await db.manager.findBy(UserServer, {
     serverId: entity.id
   })
   const pwds = userServerList.map(e => e.password)
   // 配置 trojan
-  await configTrojan(!!bt, entity.port, entity.domain, pwds, logger, logger)
+  await configTrojan(!!bt, entity.port, entity.domain, pwds, logInfo, logError)
   if (entity.bbr) {
-    await installBBR(pmt, logger, logger)
+    await installBBR(pmt, logInfo, logError)
   }
-  await stopNginx(!!bt, logger, logger)
-  await startNginx(!!bt, logger, logger)
-  await execSync('systemctl restart trojan-go', logger, logger)
+  await stopNginx(!!bt, logInfo, logError)
+  await startNginx(!!bt, logInfo, logError)
+  await execSync('systemctl restart trojan-go', logInfo, logError)
   await sleep()
-  const status = await trojanGoStatus(logger, logger)
+  const status = await trojanGoStatus(logInfo, logError)
   if (status === statusEnum.Started) {
     for (const pwd of pwds) {
       const userServer = userServerList.find(u => {
@@ -103,8 +93,8 @@ async function main() {
       try {
         const info = await execSync(
           `trojan-go -api get -target-password ${pwd}`,
-          logger,
-          logger
+          logInfo,
+          logError
         )
         const item = JSON.parse(info) as ItemT
         userServer.hash = item.user.hash
@@ -117,7 +107,7 @@ async function main() {
         userServer.uploadLimit = item.status.speed_limit.upload_speed
         await this.tUserServer.save(userServer)
       } catch (e) {
-        logger.error(` >> ${userServer.password} add fail`)
+        logError(`${userServer.password} add fail`)
       }
     }
     entity.startTime = new Date()
@@ -125,7 +115,7 @@ async function main() {
   entity.status = status
   await db.manager.save(entity)
   if (entity.bbr) {
-    await bbrReboot(logger, logger)
+    await bbrReboot(logInfo, logError)
   }
 }
 
