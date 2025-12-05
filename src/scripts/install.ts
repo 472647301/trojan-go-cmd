@@ -41,12 +41,12 @@ async function main() {
   const pmt = await checkSystem()
   await to(execSync(`${pmt} clean all`))
   if (pmt === 'apt') {
-    await execSync(`${pmt} update`)
+    await to(execSync(`${pmt} update`))
   }
-  await execSync(`${pmt} install -y wget vim unzip tar gcc openssl`)
-  await execSync(`${pmt} install -y net-tools`)
+  await to(execSync(`${pmt} install -y wget vim unzip tar gcc openssl`))
+  await to(execSync(`${pmt} install -y net-tools`))
   if (pmt === 'apt') {
-    await execSync(`${pmt} libssl-dev g++`)
+    await to(execSync(`${pmt} libssl-dev g++`))
   }
   const [, unzip] = await to(execSync('which unzip 2>/dev/null'))
   if (unzip?.indexOf('unzip') === -1) {
