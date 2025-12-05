@@ -39,7 +39,7 @@ async function main() {
     return
   }
   const pmt = await checkSystem()
-  await execSync(`${pmt} clean all`)
+  await to(execSync(`${pmt} clean all`))
   if (pmt === 'apt') {
     await execSync(`${pmt} update`)
   }
