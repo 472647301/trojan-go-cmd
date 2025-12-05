@@ -37,7 +37,7 @@ export async function checkSystem() {
   const [, yum] = await to(execSync('which yum 2>/dev/null'))
   if (yum) return 'yum'
   const [, apt] = await to(execSync('which apt 2>/dev/null'))
-  if (apt) return 'apt'
+  if (apt) return 'apt-get'
   throw new Error('不受支持的Linux系统')
 }
 

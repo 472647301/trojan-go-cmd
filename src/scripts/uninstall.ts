@@ -54,7 +54,7 @@ async function main() {
   } else {
     await to(execSync('systemctl disable nginx'))
     await to(execSync(`${pmt} remove -y nginx`))
-    if (pmt === 'apt') {
+    if (pmt === 'apt-get') {
       await to(execSync(`${pmt} remove -y nginx-common`))
     }
     await to(execSync('rm -rf /etc/nginx/nginx.conf'))

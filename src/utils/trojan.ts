@@ -136,7 +136,7 @@ export async function obtainCertificate(pmt: string, domain: string) {
       'curl -sL https://get.acme.sh | sh -s email=byron.zhuwenbo@gmail.com'
     )
   )
-  await to(execSync('source ~/.bashrc'))
+  await to(execSync(`sh ${join(__dirname, '../scripts/source.sh')}`))
   await to(execSync('~/.acme.sh/acme.sh  --upgrade  --auto-upgrade'))
   await to(execSync('~/.acme.sh/acme.sh --set-default-ca --server letsencrypt'))
   await to(
