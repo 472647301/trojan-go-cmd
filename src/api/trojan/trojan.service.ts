@@ -104,10 +104,18 @@ export class TrojanService {
     if (![statusEnum.NotStarted, statusEnum.Started].includes(entity.status)) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
-    // runScriptAndLogSpawn(
-    //   join(__dirname, '../../scripts/uninstall.js'),
-    //   `uninstall-${entity.domain.replaceAll('.', '-')}`
-    // )
+    const [, bt] = await to(execSync('which bt 2>/dev/null'))
+    await stopNginx(!!bt)
+    runScriptAndLogSpawn(
+      `uninstall-${entity.domain.replaceAll('.', '-')}`,
+      'bash',
+      [join(__dirname, '../../scripts/uninstall.js')],
+      async () => {
+        if (bt) await startNginx(true)
+        entity.status = statusEnum.NotInstalled
+        await this.tServer.save(entity)
+      }
+    )
     entity.status = statusEnum.Uninstalling
     await this.tServer.save(entity)
     return apiUtil.data({

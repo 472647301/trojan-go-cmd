@@ -44,11 +44,11 @@ export const trojanConfigJson = {
 }
 
 export const nginxConfText = () =>
-  readFileSync(join(__dirname, './nginx/nginx.conf'), {
+  readFileSync(join(__dirname, '../../nginx/nginx.conf'), {
     encoding: 'utf-8'
   }).toString()
 
 export const nginxServerConfText = () =>
-  readFileSync(join(__dirname, './nginx/server.conf'), {
+  readFileSync(join(__dirname, '../../nginx/server.conf'), {
     encoding: 'utf-8'
   }).toString()
