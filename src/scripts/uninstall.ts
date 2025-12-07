@@ -1,8 +1,9 @@
+import { spawnSync } from 'child_process'
 import * as dotenv from 'dotenv'
 import { join } from 'path'
 import { Server } from 'src/entities/server.entity'
 import { statusEnum } from 'src/enums'
-import { execSync, logError, runScriptAndLogSpawn, to } from 'src/utils'
+import { execSync, logError, to } from 'src/utils'
 import { startNginx, stopNginx } from 'src/utils/trojan'
 import { DataSource } from 'typeorm'
 
@@ -23,7 +24,7 @@ async function main() {
   const ip = await execSync('curl -sL -4 ip.sb')
   if (!ip) {
     logError('IP获取失败')
-    process.exit()
+    return
   }
   const db = await orm.initialize()
   const entity = await db.manager.findOneBy(Server, {
@@ -32,23 +33,23 @@ async function main() {
   })
   if (!entity) {
     logError('资源不存在')
-    process.exit()
+    return
   }
   const [, bt] = await to(execSync('which bt 2>/dev/null'))
   await stopNginx(!!bt)
-  runScriptAndLogSpawn(
-    join(__dirname, '../../bin/uninstall.sh'),
-    `sh-uninstall-${entity.domain.replaceAll('.', '-')}`,
+  const result = spawnSync(
     'bash',
-    async () => {
-      if (bt) await startNginx(true)
-      entity.status = statusEnum.NotInstalled
-      await db.manager.save(entity)
-      process.exit()
-    }
+    [join(__dirname, '../../bin/uninstall.sh')],
+    { encoding: 'utf8' }
   )
+  if (result.stdout) console.log('STDOUT:', result.stdout)
+  if (result.stderr) console.error('STDERR:', result.stderr)
+  if (result.error) console.error('Execution Error:', result.error.message)
+  if (bt) await startNginx(true)
+  entity.status = statusEnum.NotInstalled
+  await db.manager.save(entity)
 }
 
-main().catch(() => {
+main().finally(() => {
   process.exit()
 })

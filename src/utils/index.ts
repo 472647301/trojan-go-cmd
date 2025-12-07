@@ -1,4 +1,4 @@
-import { exec, spawn } from 'child_process'
+import { exec, spawn, spawnSync } from 'child_process'
 import dayjs from 'dayjs'
 import { Request } from 'express'
 import { closeSync, openSync } from 'fs'
@@ -64,12 +64,7 @@ export function logError(message?: any, ...optionalParams: any[]) {
   )
 }
 
-export function runScriptAndLogSpawn(
-  scriptPath: string,
-  logName: string,
-  command?: string,
-  onClose?: () => void
-) {
+export function runScriptAndLogSpawn(scriptPath: string, logName: string) {
   const stdoutLog = openSync(
     join(__dirname, `../../logs/${logName}-stdout.log`),
     'a'
@@ -80,10 +75,9 @@ export function runScriptAndLogSpawn(
   )
 
   logInfo(`Spawning child process and redirecting output to log files...`)
-  const child = spawn(command ?? process.argv[0], [scriptPath], {
+  const child = spawn(process.argv[0], [scriptPath], {
     // Pipes stdin to parent, stdout to stdoutLog FD, stderr to stderrLog FD
-    stdio: ['inherit', stdoutLog, stderrLog],
-    env: process.env
+    stdio: ['inherit', stdoutLog, stderrLog]
   })
 
   child.on('error', err => {
@@ -95,6 +89,5 @@ export function runScriptAndLogSpawn(
     // Close file descriptors when done
     closeSync(stdoutLog)
     closeSync(stderrLog)
-    onClose?.()
   })
 }
