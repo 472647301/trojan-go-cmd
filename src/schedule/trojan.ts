@@ -8,9 +8,8 @@ export class TaskTrojanService {
   // 每 5 分钟
   @Cron(CronExpression.EVERY_5_MINUTES)
   async updateInfo() {
-    runScriptAndLogSpawn(
-      join(__dirname, '../scripts/update-info.js'),
-      'update-info'
-    )
+    runScriptAndLogSpawn('update-info', process.argv[0], [
+      join(__dirname, '../scripts/update-info.js')
+    ])
   }
 }

@@ -5,13 +5,8 @@ import { Server } from 'src/entities/server.entity'
 import { statusEnum, statusText } from 'src/enums'
 import { execSync, logError, runScriptAndLogSpawn, sleep, to } from 'src/utils'
 import { apiUtil } from 'src/utils/api'
-import {
-  configNginx,
-  configTrojan,
-  startNginx,
-  stopNginx,
-  trojanGoStatus
-} from 'src/utils/trojan'
+import { configNginx, configTrojan, startNginx } from 'src/utils/trojan'
+import { stopNginx, trojanGoStatus } from 'src/utils/trojan'
 import { Repository } from 'typeorm'
 import { TrojanLimitDto, TrojanUserDto, UserAction } from './trojan.dto'
 import { UserServer } from 'src/entities/user.server.entity'
