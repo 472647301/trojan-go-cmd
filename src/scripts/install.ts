@@ -44,20 +44,12 @@ async function main() {
   const pwds = userServerList.map(e => e.password)
   // 配置 trojan
   await configTrojan(!!bt, entity.port, entity.domain, pwds)
-  try {
-    const result = spawnSync(
-      'bash',
-      [join(__dirname, '../../bin/install.sh')],
-      {
-        encoding: 'utf8'
-      }
-    )
-    if (result.stdout) logInfo('STDOUT:', result.stdout)
-    if (result.stderr) logError('STDERR:', result.stderr)
-    if (result.error) logError('Execution Error:', result.error.message)
-  } catch (e) {
-    logError('Bash Error:', e)
-  }
+  const result = spawnSync('bash', [join(__dirname, '../../bin/install.sh')], {
+    encoding: 'utf8'
+  })
+  if (result.stdout) logInfo('STDOUT:', result.stdout)
+  if (result.stderr) logError('STDERR:', result.stderr)
+  if (result.error) logError('Execution Error:', result.error.message)
   // 配置 nginx
   await configNginx(!!bt, entity.domain)
   await stopNginx(!!bt)
@@ -102,9 +94,13 @@ async function main() {
   if (bbr.error) console.error('Execution Error:', bbr.error.message)
 }
 
-main().finally(() => {
-  process.exit()
-})
+main()
+  .finally(() => {
+    process.exit()
+  })
+  .catch(e => {
+    logError('main:', e)
+  })
 
 interface ItemT {
   user: { hash: string }
