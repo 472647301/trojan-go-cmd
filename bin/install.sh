@@ -149,6 +149,67 @@ module_hotfixes=true' > /etc/yum.repos.d/nginx.repo
     fi
 }
 
+stopNginx() {
+    if [[ "$BT" = "false" ]]; then
+        systemctl stop nginx
+    else
+        /etc/init.d/nginx stop
+    fi
+}
+
+getCert() {
+    mkdir -p /etc/trojan-go
+    if [[ -z ${CERT_FILE+x} ]]; then
+        stopNginx
+        systemctl stop trojan-go
+        sleep 2
+        res=`ss -ntlp| grep -E ':80 |:443 '`
+        if [[ "${res}" != "" ]]; then
+            echo -e "${RED} 其他进程占用了80或443端口，请先关闭再运行一键脚本${PLAIN}"
+            echo " 端口占用信息如下："
+            echo ${res}
+            exit 1
+        fi
+
+        $CMD_INSTALL socat openssl
+        if [[ "$PMT" = "yum" ]]; then
+            $CMD_INSTALL cronie
+            systemctl start crond
+            systemctl enable crond
+        else
+            $CMD_INSTALL cron
+            systemctl start cron
+            systemctl enable cron
+        fi
+        curl -sL https://get.acme.sh | sh -s email=byron.zhuwenbo@gmail.com
+        source ~/.bashrc
+        ~/.acme.sh/acme.sh  --upgrade  --auto-upgrade
+        ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+        if [[ "$BT" = "false" ]]; then
+            ~/.acme.sh/acme.sh   --issue -d $DOMAIN --keylength ec-256 --pre-hook "systemctl stop nginx" --post-hook "systemctl restart nginx"  --standalone
+        else
+            ~/.acme.sh/acme.sh   --issue -d $DOMAIN --keylength ec-256 --pre-hook "nginx -s stop || { echo -n ''; }" --post-hook "nginx -c /www/server/nginx/conf/nginx.conf || { echo -n ''; }"  --standalone
+        fi
+        [[ -f ~/.acme.sh/${DOMAIN}_ecc/ca.cer ]] || {
+            colorEcho $RED " 获取证书失败"
+            exit 1
+        }
+        CERT_FILE="/etc/trojan-go/${DOMAIN}.pem"
+        KEY_FILE="/etc/trojan-go/${DOMAIN}.key"
+        ~/.acme.sh/acme.sh  --install-cert -d $DOMAIN --ecc \
+            --key-file       $KEY_FILE  \
+            --fullchain-file $CERT_FILE \
+            --reloadcmd     "service nginx force-reload"
+        [[ -f $CERT_FILE && -f $KEY_FILE ]] || {
+            colorEcho $RED " 获取证书失败"
+            exit 1
+        }
+    else
+        cp ~/trojan-go.pem /etc/trojan-go/${DOMAIN}.pem
+        cp ~/trojan-go.key /etc/trojan-go/${DOMAIN}.key
+    fi
+}
+
 downloadFile() {
     SUFFIX=`archAffix`
     DOWNLOAD_URL="${V6_PROXY}https://github.com/p4gefau1t/trojan-go/releases/download/${VERSION}/trojan-go-linux-${SUFFIX}.zip"

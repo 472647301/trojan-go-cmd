@@ -64,18 +64,23 @@ export function logError(message?: any, ...optionalParams: any[]) {
   )
 }
 
-export function runScriptAndLogSpawn(scriptPath: string, logName: string) {
+export function runScriptAndLogSpawn(
+  name: string,
+  command: string,
+  args: readonly string[],
+  onClose?: () => void
+) {
   const stdoutLog = openSync(
-    join(__dirname, `../../logs/${logName}-stdout.log`),
+    join(__dirname, `../../logs/${name}-stdout.log`),
     'a'
   ) // 'a' means append
   const stderrLog = openSync(
-    join(__dirname, `../../logs/${logName}-stderr.log`),
+    join(__dirname, `../../logs/${name}-stderr.log`),
     'a'
   )
 
   logInfo(`Spawning child process and redirecting output to log files...`)
-  const child = spawn(process.argv[0], [scriptPath], {
+  const child = spawn(command, args, {
     // Pipes stdin to parent, stdout to stdoutLog FD, stderr to stderrLog FD
     stdio: ['inherit', stdoutLog, stderrLog]
   })
@@ -89,5 +94,6 @@ export function runScriptAndLogSpawn(scriptPath: string, logName: string) {
     // Close file descriptors when done
     closeSync(stdoutLog)
     closeSync(stderrLog)
+    onClose?.()
   })
 }

@@ -3,9 +3,15 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { join } from 'path'
 import { Server } from 'src/entities/server.entity'
 import { statusEnum, statusText } from 'src/enums'
-import { execSync, runScriptAndLogSpawn, sleep, to } from 'src/utils'
+import { execSync, logError, runScriptAndLogSpawn, sleep, to } from 'src/utils'
 import { apiUtil } from 'src/utils/api'
-import { startNginx, stopNginx, trojanGoStatus } from 'src/utils/trojan'
+import {
+  configNginx,
+  configTrojan,
+  startNginx,
+  stopNginx,
+  trojanGoStatus
+} from 'src/utils/trojan'
 import { Repository } from 'typeorm'
 import { TrojanLimitDto, TrojanUserDto, UserAction } from './trojan.dto'
 import { UserServer } from 'src/entities/user.server.entity'
@@ -32,9 +38,57 @@ export class TrojanService {
     if (entity.status !== statusEnum.NotInstalled) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
+    const userServerList = await this.tUserServer.find({
+      where: { serverId: entity.id }
+    })
+    const pwds = userServerList.map(e => e.password)
+    const [, bt] = await to(execSync('which bt 2>/dev/null'))
+    // 配置 trojan
+    await configTrojan(!!bt, entity.port, entity.domain, pwds)
     runScriptAndLogSpawn(
-      join(__dirname, '../../scripts/install.js'),
-      `install-${entity.domain.replaceAll('.', '-')}`
+      `install-${entity.domain.replaceAll('.', '-')}`,
+      'bash',
+      [join(__dirname, '../../../bin/install.sh')],
+      async () => {
+        // 配置 nginx
+        await configNginx(!!bt, entity.domain)
+        await stopNginx(!!bt)
+        await startNginx(!!bt)
+        await execSync('systemctl restart trojan-go')
+        await sleep()
+        const status = await trojanGoStatus()
+        if (status === statusEnum.Started) {
+          for (const pwd of pwds) {
+            const userServer = userServerList.find(u => {
+              return u.password === pwd
+            })
+            if (!userServer) continue
+            try {
+              const info = await execSync(
+                `trojan-go -api get -target-password ${pwd}`
+              )
+              const item = JSON.parse(info) as ItemT
+              userServer.hash = item.user.hash
+              userServer.ipLimit = item.status.ip_limit
+              userServer.uploadTraffic =
+                item.status.traffic_total.upload_traffic
+              userServer.downloadTraffic =
+                item.status.traffic_total.download_traffic
+              userServer.downloadSpeed =
+                item.status.speed_current.download_speed
+              userServer.uploadSpeed = item.status.speed_current.upload_speed
+              userServer.downloadLimit = item.status.speed_limit.download_speed
+              userServer.uploadLimit = item.status.speed_limit.upload_speed
+              await this.tUserServer.save(userServer)
+            } catch (e) {
+              logError(`${userServer.password} add fail`)
+            }
+          }
+          entity.startTime = new Date()
+        }
+        entity.status = status
+        await this.tServer.save(entity)
+      }
     )
     entity.status = statusEnum.InstallationInProgress
     await this.tServer.save(entity)
@@ -55,10 +109,10 @@ export class TrojanService {
     if (![statusEnum.NotStarted, statusEnum.Started].includes(entity.status)) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
-    runScriptAndLogSpawn(
-      join(__dirname, '../../scripts/uninstall.js'),
-      `uninstall-${entity.domain.replaceAll('.', '-')}`
-    )
+    // runScriptAndLogSpawn(
+    //   join(__dirname, '../../scripts/uninstall.js'),
+    //   `uninstall-${entity.domain.replaceAll('.', '-')}`
+    // )
     entity.status = statusEnum.Uninstalling
     await this.tServer.save(entity)
     return apiUtil.data({

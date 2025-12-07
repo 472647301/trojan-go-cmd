@@ -94,13 +94,9 @@ async function main() {
   if (bbr.error) console.error('Execution Error:', bbr.error.message)
 }
 
-main()
-  .finally(() => {
-    process.exit()
-  })
-  .catch(e => {
-    logError('main:', e)
-  })
+main().finally(() => {
+  process.exit()
+})
 
 interface ItemT {
   user: { hash: string }
