@@ -3,9 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { join } from 'path'
 import { Server } from 'src/entities/server.entity'
 import { statusEnum, statusText } from 'src/enums'
-import { execSync, runScriptAndLogSpawn, sleep } from 'src/utils'
+import { execSync, runScriptAndLogSpawn, sleep, to } from 'src/utils'
 import { apiUtil } from 'src/utils/api'
-import { trojanGoStatus } from 'src/utils/trojan'
+import { startNginx, stopNginx, trojanGoStatus } from 'src/utils/trojan'
 import { Repository } from 'typeorm'
 import { TrojanLimitDto, TrojanUserDto, UserAction } from './trojan.dto'
 import { UserServer } from 'src/entities/user.server.entity'
@@ -82,6 +82,9 @@ export class TrojanService {
     if (trojanStatus !== statusEnum.NotStarted) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
+    const [, bt] = await to(execSync('which bt 2>/dev/null'))
+    await stopNginx(!!bt)
+    await startNginx(!!bt)
     await execSync('systemctl restart trojan-go')
     await sleep()
     const res = await trojanGoStatus()
@@ -111,9 +114,12 @@ export class TrojanService {
     if (trojanStatus !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
+    const [, bt] = await to(execSync('which bt 2>/dev/null'))
+    await stopNginx(!!bt)
     await execSync('systemctl stop trojan-go')
     entity.status = statusEnum.NotStarted
     await this.tServer.save(entity)
+    if (bt) await startNginx(true)
     return apiUtil.data({
       id: entity.id,
       status: entity.status

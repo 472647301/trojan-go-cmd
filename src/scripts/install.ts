@@ -1,11 +1,9 @@
 #!/bin/bash
 
 import { Server } from 'src/entities/server.entity'
-import { checkSystem, execSync, logError, sleep, to } from 'src/utils'
-import { bbrReboot, configNginx, configTrojan } from 'src/utils/trojan'
-import { downloadTrojan, installBBR, installNginx } from 'src/utils/trojan'
-import { installTrojan, obtainCertificate, setFirewall } from 'src/utils/trojan'
+import { execSync, logError, runScriptAndLogSpawn, sleep, to } from 'src/utils'
 import { startNginx, stopNginx, trojanGoStatus } from 'src/utils/trojan'
+import { configNginx, configTrojan } from 'src/utils/trojan'
 import { UserServer } from 'src/entities/user.server.entity'
 import { statusEnum } from 'src/enums'
 import { DataSource } from 'typeorm'
@@ -29,7 +27,7 @@ async function main() {
   const ip = await execSync('curl -sL -4 ip.sb')
   if (!ip) {
     logError('IP获取失败')
-    return
+    process.exit()
   }
   const db = await orm.initialize()
   const entity = await db.manager.findOneBy(Server, {
@@ -38,84 +36,69 @@ async function main() {
   })
   if (!entity) {
     logError('资源不存在')
-    return
-  }
-  const pmt = await checkSystem()
-  await to(execSync(`${pmt} clean all`))
-  if (pmt === 'apt-get') {
-    await to(execSync(`${pmt} update`))
-  }
-  await to(execSync(`${pmt} install -y wget vim unzip tar gcc openssl`))
-  await to(execSync(`${pmt} install -y net-tools`))
-  if (pmt === 'apt-get') {
-    await to(execSync(`${pmt} libssl-dev g++`))
-  }
-  const [, unzip] = await to(execSync('which unzip 2>/dev/null'))
-  if (unzip?.indexOf('unzip') === -1) {
-    logError('Install unzip error')
-    return
+    process.exit()
   }
   const [, bt] = await to(execSync('which bt 2>/dev/null'))
-  // 安装nginx
-  await installNginx(!!bt, pmt)
-  // 设置防火墙
-  await setFirewall(entity.port)
-  // 获取证书
-  if (!bt) await obtainCertificate(pmt, entity.domain)
-  // 配置 nginx
-  await configNginx(!!bt, entity.domain)
-  // 下载 trojan 文件
-  await downloadTrojan()
-  // 安装 trojan
-  await installTrojan()
   const userServerList = await db.manager.findBy(UserServer, {
     serverId: entity.id
   })
   const pwds = userServerList.map(e => e.password)
   // 配置 trojan
   await configTrojan(!!bt, entity.port, entity.domain, pwds)
-  if (entity.bbr) {
-    await installBBR(pmt)
-  }
-  await stopNginx(!!bt)
-  await startNginx(!!bt)
-  await execSync('systemctl restart trojan-go')
-  await sleep()
-  const status = await trojanGoStatus()
-  if (status === statusEnum.Started) {
-    for (const pwd of pwds) {
-      const userServer = userServerList.find(u => {
-        return u.password === pwd
-      })
-      if (!userServer) continue
-      try {
-        const info = await execSync(
-          `trojan-go -api get -target-password ${pwd}`
-        )
-        const item = JSON.parse(info) as ItemT
-        userServer.hash = item.user.hash
-        userServer.ipLimit = item.status.ip_limit
-        userServer.uploadTraffic = item.status.traffic_total.upload_traffic
-        userServer.downloadTraffic = item.status.traffic_total.download_traffic
-        userServer.downloadSpeed = item.status.speed_current.download_speed
-        userServer.uploadSpeed = item.status.speed_current.upload_speed
-        userServer.downloadLimit = item.status.speed_limit.download_speed
-        userServer.uploadLimit = item.status.speed_limit.upload_speed
-        await this.tUserServer.save(userServer)
-      } catch (e) {
-        logError(`${userServer.password} add fail`)
+  runScriptAndLogSpawn(
+    join(__dirname, '../../bin/install.sh'),
+    `sh-install-${entity.domain.replaceAll('.', '-')}`,
+    'sh',
+    async () => {
+      // 配置 nginx
+      await configNginx(!!bt, entity.domain)
+      await stopNginx(!!bt)
+      await startNginx(!!bt)
+      await execSync('systemctl restart trojan-go')
+      await sleep()
+      const status = await trojanGoStatus()
+      if (status === statusEnum.Started) {
+        for (const pwd of pwds) {
+          const userServer = userServerList.find(u => {
+            return u.password === pwd
+          })
+          if (!userServer) continue
+          try {
+            const info = await execSync(
+              `trojan-go -api get -target-password ${pwd}`
+            )
+            const item = JSON.parse(info) as ItemT
+            userServer.hash = item.user.hash
+            userServer.ipLimit = item.status.ip_limit
+            userServer.uploadTraffic = item.status.traffic_total.upload_traffic
+            userServer.downloadTraffic =
+              item.status.traffic_total.download_traffic
+            userServer.downloadSpeed = item.status.speed_current.download_speed
+            userServer.uploadSpeed = item.status.speed_current.upload_speed
+            userServer.downloadLimit = item.status.speed_limit.download_speed
+            userServer.uploadLimit = item.status.speed_limit.upload_speed
+            await this.tUserServer.save(userServer)
+          } catch (e) {
+            logError(`${userServer.password} add fail`)
+          }
+        }
+        entity.startTime = new Date()
       }
+      entity.status = status
+      await db.manager.save(entity)
+      if (entity.bbr) {
+        runScriptAndLogSpawn(
+          join(__dirname, '../../bin/installBBR.sh'),
+          `sh-install-${entity.domain.replaceAll('.', '-')}`,
+          'sh'
+        )
+      }
+      process.exit()
     }
-    entity.startTime = new Date()
-  }
-  entity.status = status
-  await db.manager.save(entity)
-  if (entity.bbr) {
-    await bbrReboot()
-  }
+  )
 }
 
-main().finally(() => {
+main().catch(() => {
   process.exit()
 })
 

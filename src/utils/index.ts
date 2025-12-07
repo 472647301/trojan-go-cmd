@@ -29,18 +29,6 @@ export function execSync(cmd: string): Promise<string> {
   })
 }
 
-export async function checkSystem() {
-  const id = await execSync('id -u')
-  if (id !== '0') throw new Error('请以ROOT身份执行')
-  const [, systemctl] = await to(execSync('which systemctl 2>/dev/null'))
-  if (!systemctl) throw new Error('系统版本过低')
-  const [, yum] = await to(execSync('which yum 2>/dev/null'))
-  if (yum) return 'yum'
-  const [, apt] = await to(execSync('which apt 2>/dev/null'))
-  if (apt) return 'apt-get'
-  throw new Error('不受支持的Linux系统')
-}
-
 export function sleep(ms = 2000) {
   return new Promise(resolve => {
     setTimeout(() => resolve(true), ms)
@@ -76,7 +64,12 @@ export function logError(message?: any, ...optionalParams: any[]) {
   )
 }
 
-export function runScriptAndLogSpawn(scriptPath: string, logName: string) {
+export function runScriptAndLogSpawn(
+  scriptPath: string,
+  logName: string,
+  command?: string,
+  onClose?: () => void
+) {
   const stdoutLog = openSync(
     join(__dirname, `../../logs/${logName}-stdout.log`),
     'a'
@@ -87,7 +80,7 @@ export function runScriptAndLogSpawn(scriptPath: string, logName: string) {
   )
 
   logInfo(`Spawning child process and redirecting output to log files...`)
-  const child = spawn(process.argv[0], [scriptPath], {
+  const child = spawn(command ?? process.argv[0], [scriptPath], {
     // Pipes stdin to parent, stdout to stdoutLog FD, stderr to stderrLog FD
     stdio: ['inherit', stdoutLog, stderrLog],
     env: process.env
@@ -102,5 +95,6 @@ export function runScriptAndLogSpawn(scriptPath: string, logName: string) {
     // Close file descriptors when done
     closeSync(stdoutLog)
     closeSync(stderrLog)
+    onClose?.()
   })
 }
