@@ -39,7 +39,7 @@ async function main() {
   runScriptAndLogSpawn(
     join(__dirname, '../../bin/uninstall.sh'),
     `sh-uninstall-${entity.domain.replaceAll('.', '-')}`,
-    'sh',
+    'bash',
     async () => {
       if (bt) await startNginx(true)
       entity.status = statusEnum.NotInstalled

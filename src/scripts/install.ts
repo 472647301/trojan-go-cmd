@@ -48,7 +48,7 @@ async function main() {
   runScriptAndLogSpawn(
     join(__dirname, '../../bin/install.sh'),
     `sh-install-${entity.domain.replaceAll('.', '-')}`,
-    'sh',
+    'bash',
     async () => {
       // 配置 nginx
       await configNginx(!!bt, entity.domain)
@@ -90,7 +90,7 @@ async function main() {
         runScriptAndLogSpawn(
           join(__dirname, '../../bin/installBBR.sh'),
           `sh-install-${entity.domain.replaceAll('.', '-')}`,
-          'sh'
+          'bash'
         )
       }
       process.exit()
