@@ -1,5 +1,5 @@
 import { Server } from 'src/entities/server.entity'
-import { execSync, logError, sleep, to } from 'src/utils'
+import { execSync, logError, logInfo, sleep, to } from 'src/utils'
 import { startNginx, stopNginx, trojanGoStatus } from 'src/utils/trojan'
 import { configNginx, configTrojan } from 'src/utils/trojan'
 import { UserServer } from 'src/entities/user.server.entity'
@@ -44,12 +44,20 @@ async function main() {
   const pwds = userServerList.map(e => e.password)
   // 配置 trojan
   await configTrojan(!!bt, entity.port, entity.domain, pwds)
-  const result = spawnSync('bash', [join(__dirname, '../../bin/install.sh')], {
-    encoding: 'utf8'
-  })
-  if (result.stdout) console.log('STDOUT:', result.stdout)
-  if (result.stderr) console.error('STDERR:', result.stderr)
-  if (result.error) console.error('Execution Error:', result.error.message)
+  try {
+    const result = spawnSync(
+      'bash',
+      [join(__dirname, '../../bin/install.sh')],
+      {
+        encoding: 'utf8'
+      }
+    )
+    if (result.stdout) logInfo('STDOUT:', result.stdout)
+    if (result.stderr) logError('STDERR:', result.stderr)
+    if (result.error) logError('Execution Error:', result.error.message)
+  } catch (e) {
+    logError('Bash Error:', e)
+  }
   // 配置 nginx
   await configNginx(!!bt, entity.domain)
   await stopNginx(!!bt)

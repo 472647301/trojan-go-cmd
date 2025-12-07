@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv'
 import { join } from 'path'
 import { Server } from 'src/entities/server.entity'
 import { statusEnum } from 'src/enums'
-import { execSync, logError, to } from 'src/utils'
+import { execSync, logError, logInfo, to } from 'src/utils'
 import { startNginx, stopNginx } from 'src/utils/trojan'
 import { DataSource } from 'typeorm'
 
@@ -37,14 +37,18 @@ async function main() {
   }
   const [, bt] = await to(execSync('which bt 2>/dev/null'))
   await stopNginx(!!bt)
-  const result = spawnSync(
-    'bash',
-    [join(__dirname, '../../bin/uninstall.sh')],
-    { encoding: 'utf8' }
-  )
-  if (result.stdout) console.log('STDOUT:', result.stdout)
-  if (result.stderr) console.error('STDERR:', result.stderr)
-  if (result.error) console.error('Execution Error:', result.error.message)
+  try {
+    const result = spawnSync(
+      'bash',
+      [join(__dirname, '../../bin/uninstall.sh')],
+      { encoding: 'utf8' }
+    )
+    if (result.stdout) logInfo('STDOUT:', result.stdout)
+    if (result.stderr) logError('STDERR:', result.stderr)
+    if (result.error) logError('Execution Error:', result.error.message)
+  } catch (e) {
+    logError('Base Error:', e)
+  }
   if (bt) await startNginx(true)
   entity.status = statusEnum.NotInstalled
   await db.manager.save(entity)
