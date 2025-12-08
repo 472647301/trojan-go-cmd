@@ -10,6 +10,7 @@ import { TrojanLimitDto, TrojanUserDto, UserAction } from './trojan.dto'
 import { UserServer } from 'src/entities/user.server.entity'
 import { configTrojanJson, fetchTrojanStatus } from 'src/utils/trojan'
 import { startNginx, stopNginx } from 'src/utils/trojan'
+import { readFileSync, writeFileSync } from 'fs'
 
 @Injectable()
 export class TrojanService {
@@ -20,8 +21,13 @@ export class TrojanService {
     private readonly tServer: Repository<Server>
   ) {}
 
-  private async updateTrojan() {
-    await sleep()
+  private async updateTrojan(isInstall?: boolean) {
+    if (isInstall) {
+      const html = readFileSync(join(__dirname, '../../../html/index.html'))
+      writeFileSync('/usr/share/nginx/html/index.html', html, {
+        encoding: 'utf-8'
+      })
+    }
     runSpawnAndLog('update-trojan', process.argv[0], [
       join(__dirname, '../../scripts/update-trojan.js')
     ])
@@ -46,7 +52,7 @@ export class TrojanService {
       `install-${entity.domain.replaceAll('.', '-')}`,
       'bash',
       [join(__dirname, '../../../bin/install.sh')],
-      () => this.updateTrojan()
+      () => this.updateTrojan(true)
     )
     entity.status = statusEnum.InstallationInProgress
     await this.tServer.save(entity)

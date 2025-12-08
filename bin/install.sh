@@ -329,14 +329,35 @@ http {
     include /etc/nginx/conf.d/*.conf;
 }
 EOF
+    fi
+
     mkdir -p $NGINX_CONF_PATH
-    cat > $NGINX_CONF_PATH${DOMAIN}.conf<<-EOF
+    if [[ "$PROXY_URL" = "" ]]; then
+        cat > $NGINX_CONF_PATH${DOMAIN}.conf<<-EOF
 server {
     listen 80;
     listen [::]:80;
     server_name ${DOMAIN};
-    root /opt/trojan-go-cmd/html;
+    root /usr/share/nginx/html;
 
+    $ROBOT_CONFIG
+}
+EOF
+    else
+        cat > $NGINX_CONF_PATH${DOMAIN}.conf<<-EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+    root /usr/share/nginx/html;
+    location / {
+        proxy_ssl_server_name on;
+        proxy_pass $PROXY_URL;
+        proxy_set_header Accept-Encoding '';
+        sub_filter "$REMOTE_HOST" "$DOMAIN";
+        sub_filter_once off;
+    }
+    
     $ROBOT_CONFIG
 }
 EOF
