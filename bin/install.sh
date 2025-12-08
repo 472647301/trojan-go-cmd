@@ -329,8 +329,6 @@ http {
     include /etc/nginx/conf.d/*.conf;
 }
 EOF
-    fi
-
     mkdir -p $NGINX_CONF_PATH
     cat > $NGINX_CONF_PATH${DOMAIN}.conf<<-EOF
 server {
