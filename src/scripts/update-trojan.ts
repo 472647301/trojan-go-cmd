@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv'
 import { join } from 'path'
 import { Server } from 'src/entities/server.entity'
-import { execSync, logError, to } from 'src/utils'
+import { execSync, logError, logInfo, to } from 'src/utils'
 import { DataSource } from 'typeorm'
 import { statusEnum } from 'src/enums'
 import { fetchTrojanStatus } from 'src/utils/trojan'
@@ -21,6 +21,7 @@ const orm = new DataSource({
 })
 
 async function main() {
+  logInfo('Task: update-trojan')
   const ip = await execSync('curl -sL -4 ip.sb')
   if (!ip) {
     logError('IP获取失败')
