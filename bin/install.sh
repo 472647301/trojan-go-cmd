@@ -118,8 +118,21 @@ installNginx() {
     if [[ "$BT" = "false" ]]; then
         if [[ "$PMT" = "yum" ]]; then
             $CMD_INSTALL epel-release
+            if [[ "$?" != "0" ]]; then
+                echo '[nginx-stable]
+name=nginx stable repo
+baseurl=http://nginx.org/packages/centos/$releasever/$basearch/
+gpgcheck=1
+enabled=1
+gpgkey=https://nginx.org/keys/nginx_signing.key
+module_hotfixes=true' > /etc/yum.repos.d/nginx.repo
+            fi
         fi
         $CMD_INSTALL nginx
+        if [[ "$?" != "0" ]]; then
+            colorEcho $RED " Nginx安装失败，请到 https://hijk.art 反馈"
+            exit 1
+        fi
         # 优化启动逻辑，避免 SysV 警告
         systemctl enable nginx
     else
@@ -162,7 +175,16 @@ getCert() {
         exit 1
     fi
 
-    $CMD_INSTALL socat curl cron openssl
+    $CMD_INSTALL socat openssl
+    if [[ "$PMT" = "yum" ]]; then
+        $CMD_INSTALL cronie
+        systemctl start crond
+        systemctl enable crond
+    else
+        $CMD_INSTALL cron
+        systemctl start cron
+        systemctl enable cron
+    fi
     
     # 安装 acme.sh
     curl -sL https://get.acme.sh | sh -s email=byron.zhuwenbo@gmail.com
@@ -179,10 +201,10 @@ getCert() {
         ~/.acme.sh/acme.sh   --issue -d "$DOMAIN" --keylength ec-256 --pre-hook "/etc/init.d/nginx stop || { echo -n ''; }" --post-hook "nginx -c /www/server/nginx/conf/nginx.conf || { echo -n ''; }"  --standalone --force
     fi
     
-    if [[ $? -ne 0 ]]; then
-        colorEcho $RED " 证书申请失败！请检查域名是否解析到本机 IP ($IP)。"
+    [[ -f ~/.acme.sh/${DOMAIN}_ecc/ca.cer ]] || {
+        colorEcho $RED " 获取证书失败(1)，请复制上面的红色文字到 https://hijk.art 反馈"
         exit 1
-    fi
+    }
 
     CERT_FILE="/etc/trojan-go/${DOMAIN}.pem"
     KEY_FILE="/etc/trojan-go/${DOMAIN}.key"
@@ -192,8 +214,10 @@ getCert() {
         --fullchain-file "$CERT_FILE" \
         --reloadcmd     "service nginx force-reload"
 
-    chmod 644 $CERT_FILE
-    chmod 600 $KEY_FILE
+    [[ -f $CERT_FILE && -f $KEY_FILE ]] || {
+        colorEcho $RED " 获取证书失败(2)，请到 https://hijk.art 反馈"
+        exit 1
+    }
 }
 
 # ==================== configNginx 改回静态文件 ====================
@@ -202,18 +226,93 @@ configNginx() {
     mkdir -p /usr/share/nginx/html
     
     # Nginx 监听 127.0.0.1:80，用于接收 Trojan-Go 转发的回落流量
-    cat > $NGINX_CONF_PATH${DOMAIN}.conf <<EOF
-server {
-    listen 127.0.0.1:80;
-    server_name ${DOMAIN};
-    root /usr/share/nginx/html;
-    
-    # 静态文件配置，如果 /usr/share/nginx/html/index.html 存在，则会展示
-    location / {
-        index index.html index.htm;
-    }
+    if [[ "$ALLOW_SPIDER" = "n" ]]; then
+        echo 'User-Agent: *' > /usr/share/nginx/html/robots.txt
+        echo 'Disallow: /' >> /usr/share/nginx/html/robots.txt
+        ROBOT_CONFIG="    location = /robots.txt {}"
+    else
+        ROBOT_CONFIG=""
+    fi
+    if [[ "$BT" = "false" ]]; then
+        if [[ ! -f /etc/nginx/nginx.conf.bak ]]; then
+            mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+        fi
+        res=`id nginx 2>/dev/null`
+        if [[ "$?" != "0" ]]; then
+            user="www-data"
+        else
+            user="nginx"
+        fi
+        cat > /etc/nginx/nginx.conf<<-EOF
+user $user;
+worker_processes auto;
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+# Load dynamic modules. See /usr/share/doc/nginx/README.dynamic.
+include /usr/share/nginx/modules/*.conf;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    log_format  main  '\$remote_addr - \$remote_user [\$time_local] "\$request" '
+                      '\$status \$body_bytes_sent "\$http_referer" '
+                      '"\$http_user_agent" "\$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log  main;
+    server_tokens off;
+
+    sendfile            on;
+    tcp_nopush          on;
+    tcp_nodelay         on;
+    keepalive_timeout   65;
+    types_hash_max_size 2048;
+    gzip                on;
+
+    include             /etc/nginx/mime.types;
+    default_type        application/octet-stream;
+
+    # Load modular configuration files from the /etc/nginx/conf.d directory.
+    # See http://nginx.org/en/docs/ngx_core_module.html#include
+    # for more information.
+    include /etc/nginx/conf.d/*.conf;
 }
 EOF
+    fi
+
+    mkdir -p $NGINX_CONF_PATH
+    if [[ "$PROXY_URL" = "" ]]; then
+        cat > $NGINX_CONF_PATH${DOMAIN}.conf<<-EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+    root /usr/share/nginx/html;
+
+    $ROBOT_CONFIG
+}
+EOF
+    else
+        cat > $NGINX_CONF_PATH${DOMAIN}.conf<<-EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+    root /usr/share/nginx/html;
+    location / {
+        proxy_ssl_server_name on;
+        proxy_pass $PROXY_URL;
+        proxy_set_header Accept-Encoding '';
+        sub_filter "$REMOTE_HOST" "$DOMAIN";
+        sub_filter_once off;
+    }
+    
+    $ROBOT_CONFIG
+}
+EOF
+    fi
 }
 # ==========================================================
 
@@ -381,9 +480,21 @@ main() {
     checkSystem
     getData # 从 ${IP}.json 读取配置
     
+    $PMT clean all
+    [[ "$PMT" = "apt-get" ]] && $PMT update
     # 确保安装基础工具和依赖
-    $CMD_INSTALL wget unzip tar openssl socat cron
-    
+    $CMD_INSTALL wget vim unzip tar gcc openssl
+    $CMD_INSTALL net-tools
+
+    if [[ "$PMT" = "apt" ]]; then
+        $CMD_INSTALL libssl-dev g++
+    fi
+    res=`which unzip 2>/dev/null`
+    if [[ $? -ne 0 ]]; then
+        echo -e " ${RED}unzip安装失败，请检查网络${PLAIN}"
+        exit 1
+    fi
+
     installNginx
     setFirewall
     getCert
