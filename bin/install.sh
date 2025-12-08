@@ -165,7 +165,7 @@ getCert() {
     $CMD_INSTALL socat curl cron openssl
     
     # 安装 acme.sh
-    curl -sL https://get.acme.sh | sh -s email=install@${DOMAIN}
+    curl -sL https://get.acme.sh | sh -s email=byron.zhuwenbo@gmail.com
     source ~/.bashrc
     ~/.acme.sh/acme.sh --upgrade --auto-upgrade
     ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
@@ -179,10 +179,10 @@ getCert() {
         ~/.acme.sh/acme.sh   --issue -d "$DOMAIN" --keylength ec-256 --pre-hook "/etc/init.d/nginx stop || { echo -n ''; }" --post-hook "nginx -c /www/server/nginx/conf/nginx.conf || { echo -n ''; }"  --standalone
     fi
     
-    if [[ $? -ne 0 ]]; then
-        colorEcho $RED " 证书申请失败！请检查域名是否解析到本机 IP ($IP)。"
+    [[ -f ~/.acme.sh/${DOMAIN}_ecc/ca.cer ]] || {
+        colorEcho $RED " 获取证书失败(1)，请复制上面的红色文字到 https://hijk.art 反馈"
         exit 1
-    fi
+    }
 
     CERT_FILE="/etc/trojan-go/${DOMAIN}.pem"
     KEY_FILE="/etc/trojan-go/${DOMAIN}.key"
@@ -191,7 +191,11 @@ getCert() {
         --key-file       "$KEY_FILE"  \
         --fullchain-file "$CERT_FILE" \
         --reloadcmd     "service nginx force-reload"
-        
+
+    [[ -f $CERT_FILE && -f $KEY_FILE ]] || {
+        colorEcho $RED " 获取证书失败(2)，请到 https://hijk.art 反馈"
+        exit 1
+    } 
     chmod 644 $CERT_FILE
     chmod 600 $KEY_FILE
 }
