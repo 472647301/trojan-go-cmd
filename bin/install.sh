@@ -174,15 +174,15 @@ getCert() {
     colorEcho $YELLOW " 正在申请证书，请等待..."
     if [[ "$BT" = "false" ]]; then
         # 注意: 这里使用 pre-hook 和 post-hook 来控制 Nginx，确保 80 端口可用
-        ~/.acme.sh/acme.sh   --issue -d "$DOMAIN" --keylength ec-256 --pre-hook "systemctl stop nginx" --post-hook "systemctl restart nginx"  --standalone
+        ~/.acme.sh/acme.sh   --issue -d "$DOMAIN" --keylength ec-256 --pre-hook "systemctl stop nginx" --post-hook "systemctl restart nginx"  --standalone --force
     else
-        ~/.acme.sh/acme.sh   --issue -d "$DOMAIN" --keylength ec-256 --pre-hook "/etc/init.d/nginx stop || { echo -n ''; }" --post-hook "nginx -c /www/server/nginx/conf/nginx.conf || { echo -n ''; }"  --standalone
+        ~/.acme.sh/acme.sh   --issue -d "$DOMAIN" --keylength ec-256 --pre-hook "/etc/init.d/nginx stop || { echo -n ''; }" --post-hook "nginx -c /www/server/nginx/conf/nginx.conf || { echo -n ''; }"  --standalone --force
     fi
     
-    [[ -f ~/.acme.sh/${DOMAIN}_ecc/ca.cer ]] || {
-        colorEcho $RED " 获取证书失败(1)，请复制上面的红色文字到 https://hijk.art 反馈"
+    if [[ $? -ne 0 ]]; then
+        colorEcho $RED " 证书申请失败！请检查域名是否解析到本机 IP ($IP)。"
         exit 1
-    }
+    fi
 
     CERT_FILE="/etc/trojan-go/${DOMAIN}.pem"
     KEY_FILE="/etc/trojan-go/${DOMAIN}.key"
@@ -192,10 +192,6 @@ getCert() {
         --fullchain-file "$CERT_FILE" \
         --reloadcmd     "service nginx force-reload"
 
-    [[ -f $CERT_FILE && -f $KEY_FILE ]] || {
-        colorEcho $RED " 获取证书失败(2)，请到 https://hijk.art 反馈"
-        exit 1
-    } 
     chmod 644 $CERT_FILE
     chmod 600 $KEY_FILE
 }
@@ -373,8 +369,7 @@ start() {
     systemctl restart trojan-go
     sleep 2
     
-    port=$(grep local_port $CONFIG_FILE|cut -d: -f2| tr -d \",' ')
-    res=$(ss -ntlp| grep ${port} | grep trojan-go)
+    res=$(ss -ntlp| grep ${PORT} | grep trojan-go)
     if [[ "$res" = "" ]]; then
         colorEcho $RED " trojan-go启动失败，请检查端口是否被占用！"
     else
