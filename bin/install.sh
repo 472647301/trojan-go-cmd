@@ -414,7 +414,14 @@ configTrojan() {
       "username": "",
       "password": "",
       "check_rate": 60
-    }
+    },
+    "api": {
+        "enabled": true,
+        "api_addr": "127.0.0.1",
+        "api_port": 10000
+    },
+    "log_level": 2,
+    "log_file": "/etc/trojan-go/main.log"
 }
 EOF
 }
