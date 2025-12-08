@@ -37,15 +37,15 @@ checkSystem() {
 
     res=`which yum 2>/dev/null`
     if [[ "$?" != "0" ]]; then
-        res=`which apt 2>/dev/null`
+        res=`which apt-get 2>/dev/null`
         if [[ "$?" != "0" ]]; then
             echo -e " ${RED}不受支持的Linux系统${PLAIN}"
             exit 1
         fi
-        PMT="apt"
-        CMD_INSTALL="apt install -y "
-        CMD_REMOVE="apt remove -y "
-        CMD_UPGRADE="apt update; apt upgrade -y; apt autoremove -y"
+        PMT="apt-get"
+        CMD_INSTALL="apt-get install -y "
+        CMD_REMOVE="apt-get remove -y "
+        CMD_UPGRADE="apt-get update; apt-get upgrade -y; apt-get autoremove -y"
     else
         PMT="yum"
         CMD_INSTALL="yum install -y "
@@ -110,7 +110,7 @@ uninstall() {
     if [[ "$BT" = "false" ]]; then
         systemctl disable nginx
         $CMD_REMOVE nginx
-        if [[ "$PMT" = "apt" ]]; then
+        if [[ "$PMT" = "apt-get" ]]; then
             $CMD_REMOVE nginx-common
         fi
         rm -rf /etc/nginx/nginx.conf
