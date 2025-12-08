@@ -4,7 +4,7 @@ import { Server } from 'src/entities/server.entity'
 import { execSync, logError, to } from 'src/utils'
 import { DataSource } from 'typeorm'
 import { statusEnum } from 'src/enums'
-import { trojanGoStatus } from 'src/utils/trojan'
+import { fetchTrojanStatus } from 'src/utils/trojan'
 import { UserServer } from 'src/entities/user.server.entity'
 
 dotenv.config({ path: ['.env'] })
@@ -29,15 +29,18 @@ async function main() {
   const db = await orm.initialize()
   const entity = await db.manager.findOneBy(Server, {
     ip: ip,
-    enable: 1,
-    status: statusEnum.Started
+    enable: 1
   })
   if (!entity) {
     logError('资源不存在')
     return
   }
-  const status = await trojanGoStatus()
-  if (status !== statusEnum.Started) return
+  const status = await fetchTrojanStatus(entity.port)
+  if (status !== statusEnum.Started) {
+    entity.status = status
+    await db.manager.save(entity)
+    return
+  }
   const userServerList = await db.manager.findBy(UserServer, {
     serverId: entity.id
   })
@@ -73,6 +76,7 @@ async function main() {
   entity.uploadTraffic = uploadTraffic
   entity.downloadTraffic = downloadTraffic
   entity.online = list.length
+  entity.status = status
   await db.manager.save(entity)
 }
 

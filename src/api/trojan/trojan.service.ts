@@ -3,13 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { join } from 'path'
 import { Server } from 'src/entities/server.entity'
 import { statusEnum, statusText } from 'src/enums'
-import { execSync, logError, runScriptAndLogSpawn, sleep, to } from 'src/utils'
+import { execSync, runSpawnAndLog, sleep, to } from 'src/utils'
 import { apiUtil } from 'src/utils/api'
-import { configNginx, configTrojan, startNginx } from 'src/utils/trojan'
-import { stopNginx, trojanGoStatus } from 'src/utils/trojan'
 import { Repository } from 'typeorm'
 import { TrojanLimitDto, TrojanUserDto, UserAction } from './trojan.dto'
 import { UserServer } from 'src/entities/user.server.entity'
+import { configTrojanJson, fetchTrojanStatus } from 'src/utils/trojan'
+import { startNginx, stopNginx } from 'src/utils/trojan'
 
 @Injectable()
 export class TrojanService {
@@ -37,53 +37,14 @@ export class TrojanService {
       where: { serverId: entity.id }
     })
     const pwds = userServerList.map(e => e.password)
-    const [, bt] = await to(execSync('which bt 2>/dev/null'))
     // 配置 trojan
-    await configTrojan(!!bt, entity.port, entity.domain, pwds)
-    runScriptAndLogSpawn(
+    configTrojanJson(ip, entity.port, entity.domain, pwds)
+    const updateScript = join(__dirname, '../../scripts/update-trojan.ts')
+    runSpawnAndLog(
       `install-${entity.domain.replaceAll('.', '-')}`,
       'bash',
       [join(__dirname, '../../../bin/install.sh')],
-      async () => {
-        // 配置 nginx
-        await configNginx(!!bt, entity.domain)
-        await stopNginx(!!bt)
-        await startNginx(!!bt)
-        await execSync('systemctl restart trojan-go')
-        await sleep()
-        const status = await trojanGoStatus()
-        if (status === statusEnum.Started) {
-          for (const pwd of pwds) {
-            const userServer = userServerList.find(u => {
-              return u.password === pwd
-            })
-            if (!userServer) continue
-            try {
-              const info = await execSync(
-                `trojan-go -api get -target-password ${pwd}`
-              )
-              const item = JSON.parse(info) as ItemT
-              userServer.hash = item.user.hash
-              userServer.ipLimit = item.status.ip_limit
-              userServer.uploadTraffic =
-                item.status.traffic_total.upload_traffic
-              userServer.downloadTraffic =
-                item.status.traffic_total.download_traffic
-              userServer.downloadSpeed =
-                item.status.speed_current.download_speed
-              userServer.uploadSpeed = item.status.speed_current.upload_speed
-              userServer.downloadLimit = item.status.speed_limit.download_speed
-              userServer.uploadLimit = item.status.speed_limit.upload_speed
-              await this.tUserServer.save(userServer)
-            } catch (e) {
-              logError(`${userServer.password} add fail`)
-            }
-          }
-          entity.startTime = new Date()
-        }
-        entity.status = status
-        await this.tServer.save(entity)
-      }
+      () => to(execSync(`node ${updateScript}`))
     )
     entity.status = statusEnum.InstallationInProgress
     await this.tServer.save(entity)
@@ -104,17 +65,12 @@ export class TrojanService {
     if (![statusEnum.NotStarted, statusEnum.Started].includes(entity.status)) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
-    const [, bt] = await to(execSync('which bt 2>/dev/null'))
-    await stopNginx(!!bt)
-    runScriptAndLogSpawn(
+    const updateScript = join(__dirname, '../../scripts/update-trojan.ts')
+    runSpawnAndLog(
       `uninstall-${entity.domain.replaceAll('.', '-')}`,
       'bash',
       [join(__dirname, '../../scripts/uninstall.js')],
-      async () => {
-        if (bt) await startNginx(true)
-        entity.status = statusEnum.NotInstalled
-        await this.tServer.save(entity)
-      }
+      () => to(execSync(`node ${updateScript}`))
     )
     entity.status = statusEnum.Uninstalling
     await this.tServer.save(entity)
@@ -135,7 +91,7 @@ export class TrojanService {
     if (entity.status !== statusEnum.NotStarted) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
-    const trojanStatus = await trojanGoStatus()
+    const trojanStatus = await fetchTrojanStatus(entity.port)
     if (trojanStatus !== statusEnum.NotStarted) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
@@ -144,7 +100,7 @@ export class TrojanService {
     await startNginx(!!bt)
     await execSync('systemctl restart trojan-go')
     await sleep()
-    const res = await trojanGoStatus()
+    const res = await fetchTrojanStatus(entity.port)
     if (res !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
@@ -167,7 +123,7 @@ export class TrojanService {
     if (entity.status !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
-    const trojanStatus = await trojanGoStatus()
+    const trojanStatus = await fetchTrojanStatus(entity.port)
     if (trojanStatus !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
@@ -192,7 +148,7 @@ export class TrojanService {
     if (userServer.server.status !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[userServer.server.status]}`)
     }
-    const trojanStatus = await trojanGoStatus()
+    const trojanStatus = await fetchTrojanStatus(userServer.server.port)
     if (trojanStatus !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[userServer.server.status]}`)
     }
@@ -238,7 +194,7 @@ export class TrojanService {
     if (userServer.server.status !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[userServer.server.status]}`)
     }
-    const trojanStatus = await trojanGoStatus()
+    const trojanStatus = await fetchTrojanStatus(userServer.server.port)
     if (trojanStatus !== statusEnum.Started) {
       return apiUtil.error(`当前服务器-${statusText[userServer.server.status]}`)
     }

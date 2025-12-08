@@ -78,6 +78,20 @@ status() {
     fi
 }
 
+stopNginx() {
+    if [[ "$BT" = "false" ]]; then
+        systemctl stop nginx
+    else
+        /etc/init.d/nginx stop
+    fi
+}
+
+stop() {
+    stopNginx
+    systemctl stop trojan-go
+    colorEcho $BLUE " trojan-go停止成功"
+}
+
 uninstall() {
     res=`status`
     if [[ $res -lt 2 ]]; then
@@ -86,7 +100,8 @@ uninstall() {
     fi
 
     domain=`grep sni $CONFIG_FILE | cut -d\" -f4`
-      
+        
+    stop
     rm -rf /etc/trojan-go
     rm -rf /usr/bin/trojan-go
     systemctl disable trojan-go

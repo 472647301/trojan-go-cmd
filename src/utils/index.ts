@@ -64,7 +64,7 @@ export function logError(message?: any, ...optionalParams: any[]) {
   )
 }
 
-export function runScriptAndLogSpawn(
+export function runSpawnAndLog(
   name: string,
   command: string,
   args: readonly string[],
