@@ -335,16 +335,10 @@ EOF
     if [[ "$PROXY_URL" = "" ]]; then
         cat > $NGINX_CONF_PATH${DOMAIN}.conf<<-EOF
 server {
-    listen 443 ssl;
+    listen 80;
+    listen [::]:80;
     server_name ${DOMAIN};
     root /usr/share/nginx/html;
-
-    ssl_certificate ${CERT_FILE};
-    ssl_certificate_key ${KEY_FILE};
-    # 添加 TLS 优化参数 (安全性和性能) [2]
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers 'TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256';
-    ssl_prefer_server_ciphers on;
 
     $ROBOT_CONFIG
 }
