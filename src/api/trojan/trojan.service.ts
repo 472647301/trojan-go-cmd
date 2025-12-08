@@ -10,7 +10,7 @@ import { TrojanLimitDto, TrojanUserDto, UserAction } from './trojan.dto'
 import { UserServer } from 'src/entities/user.server.entity'
 import { configTrojanJson, fetchTrojanStatus } from 'src/utils/trojan'
 import { startNginx, stopNginx } from 'src/utils/trojan'
-import { readFileSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 
 @Injectable()
 export class TrojanService {
@@ -22,7 +22,7 @@ export class TrojanService {
   ) {}
 
   private async updateTrojan(isInstall?: boolean) {
-    if (isInstall) {
+    if (isInstall && existsSync('/usr/share/nginx/html/index.html')) {
       const html = readFileSync(join(__dirname, '../../../html/index.html'))
       writeFileSync('/usr/share/nginx/html/index.html', html, {
         encoding: 'utf-8'
@@ -52,7 +52,7 @@ export class TrojanService {
       `install-${entity.domain.replaceAll('.', '-')}`,
       'bash',
       [join(__dirname, '../../../bin/install.sh')],
-      () => this.updateTrojan(true)
+      () => this.updateTrojan()
     )
     entity.status = statusEnum.InstallationInProgress
     await this.tServer.save(entity)
@@ -180,14 +180,15 @@ export class TrojanService {
       `trojan-go -api get -target-password ${userServer.password}`
     )
     const item = JSON.parse(info) as ItemT
-    userServer.hash = item.user.hash
-    userServer.ipLimit = item.status.ip_limit
-    userServer.uploadTraffic = item.status.traffic_total.upload_traffic
-    userServer.downloadTraffic = item.status.traffic_total.download_traffic
-    userServer.downloadSpeed = item.status.speed_current.download_speed
-    userServer.uploadSpeed = item.status.speed_current.upload_speed
-    userServer.downloadLimit = item.status.speed_limit.download_speed
-    userServer.uploadLimit = item.status.speed_limit.upload_speed
+    userServer.hash = item.status?.user?.hash ?? null
+    userServer.ipLimit = item.status?.ip_limit ?? 0
+    userServer.uploadTraffic = item.status?.traffic_total?.upload_traffic ?? 0
+    userServer.downloadTraffic =
+      item.status?.traffic_total?.download_traffic ?? 0
+    userServer.downloadSpeed = item.status?.speed_current?.download_speed ?? 0
+    userServer.uploadSpeed = item.status?.speed_current?.upload_speed ?? 0
+    userServer.downloadLimit = item.status?.speed_limit?.download_speed ?? 0
+    userServer.uploadLimit = item.status?.speed_limit?.upload_speed ?? 0
     await this.tUserServer.save(userServer)
     return apiUtil.data({ id: userServer.id })
   }
@@ -206,11 +207,7 @@ export class TrojanService {
       return apiUtil.error(`当前服务器-${statusText[userServer.server.status]}`)
     }
     const res = await execSync(
-      `trojan-go -api-addr 127.0.0.1:10000 -api set -modify-profile -target-password ${userServer.password} \
-        -ip-limit ${body.ip} \
-        -upload-speed-limit ${body.upload} \
-        -download-speed-limit ${body.download} \
-      `
+      `trojan-go -api-addr 127.0.0.1:10000 -api set -modify-profile -target-password ${userServer.password} -ip-limit ${body.ip} -upload-speed-limit ${body.upload} -download-speed-limit ${body.download}`
     )
     if (res !== 'Done') {
       return apiUtil.error(res)
@@ -223,20 +220,20 @@ export class TrojanService {
 }
 
 interface ItemT {
-  user: { hash: string }
   status: {
-    traffic_total: {
-      upload_traffic: number
-      download_traffic: number
+    traffic_total?: {
+      upload_traffic?: number
+      download_traffic?: number
     }
-    speed_current: {
-      upload_speed: number
-      download_speed: number
+    speed_current?: {
+      upload_speed?: number
+      download_speed?: number
     }
-    speed_limit: {
-      upload_speed: number
-      download_speed: number
+    speed_limit?: {
+      upload_speed?: number
+      download_speed?: number
     }
-    ip_limit: number
+    user?: { hash?: string }
+    ip_limit?: number
   }
 }

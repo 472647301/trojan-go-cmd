@@ -39,14 +39,14 @@ async function addUserServerHash(db: DataSource, serverId: number) {
         `trojan-go -api get -target-password ${user.password}`
       )
       const item = JSON.parse(info) as ItemT
-      user.hash = item.user.hash
-      user.ipLimit = item.status.ip_limit
-      user.uploadTraffic = item.status.traffic_total.upload_traffic
-      user.downloadTraffic = item.status.traffic_total.download_traffic
-      user.downloadSpeed = item.status.speed_current.download_speed
-      user.uploadSpeed = item.status.speed_current.upload_speed
-      user.downloadLimit = item.status.speed_limit.download_speed
-      user.uploadLimit = item.status.speed_limit.upload_speed
+      user.hash = item.status?.user?.hash ?? null
+      user.ipLimit = item.status?.ip_limit ?? 0
+      user.uploadTraffic = item.status?.traffic_total?.upload_traffic ?? 0
+      user.downloadTraffic = item.status?.traffic_total?.download_traffic ?? 0
+      user.downloadSpeed = item.status?.speed_current?.download_speed ?? 0
+      user.uploadSpeed = item.status?.speed_current?.upload_speed ?? 0
+      user.downloadLimit = item.status?.speed_limit?.download_speed ?? 0
+      user.uploadLimit = item.status?.speed_limit?.upload_speed ?? 0
       await this.tUserServer.save(user)
     } catch (e) {
       logError('[AddUserServerHash]: ', e)
@@ -94,22 +94,23 @@ async function main() {
   let downloadTraffic = 0
   const list = JSON.parse(text) as ItemT[]
   for (const item of list) {
-    ipLimit += item.status.ip_limit
-    uploadTraffic += item.status.traffic_total.upload_traffic
-    downloadTraffic += item.status.traffic_total.download_traffic
+    ipLimit += item.status?.ip_limit ?? 0
+    uploadTraffic += item.status?.traffic_total?.upload_traffic ?? 0
+    downloadTraffic += item.status?.traffic_total?.download_traffic ?? 0
     if (entity.status === statusEnum.InstallationInProgress) continue
     // addUserServerHash 已更新
     const userServer = userServerList.find(e => {
-      return e.hash === item.user.hash
+      return e.hash === item.status?.user?.hash
     })
     if (!userServer) continue
-    userServer.ipLimit = item.status.ip_limit
-    userServer.uploadTraffic = item.status.traffic_total.upload_traffic
-    userServer.downloadTraffic = item.status.traffic_total.download_traffic
-    userServer.downloadSpeed = item.status.speed_current.download_speed
-    userServer.uploadSpeed = item.status.speed_current.upload_speed
-    userServer.downloadLimit = item.status.speed_limit.download_speed
-    userServer.uploadLimit = item.status.speed_limit.upload_speed
+    userServer.ipLimit = item.status?.ip_limit ?? 0
+    userServer.uploadTraffic = item.status?.traffic_total?.upload_traffic ?? 0
+    userServer.downloadTraffic =
+      item.status?.traffic_total?.download_traffic ?? 0
+    userServer.downloadSpeed = item.status?.speed_current?.download_speed ?? 0
+    userServer.uploadSpeed = item.status?.speed_current?.upload_speed ?? 0
+    userServer.downloadLimit = item.status?.speed_limit?.download_speed ?? 0
+    userServer.uploadLimit = item.status?.speed_limit?.upload_speed ?? 0
     await db.manager.save(userServer)
   }
   entity.ipLimit = ipLimit
@@ -125,20 +126,20 @@ main().finally(() => {
 })
 
 interface ItemT {
-  user: { hash: string }
   status: {
-    traffic_total: {
-      upload_traffic: number
-      download_traffic: number
+    traffic_total?: {
+      upload_traffic?: number
+      download_traffic?: number
     }
-    speed_current: {
-      upload_speed: number
-      download_speed: number
+    speed_current?: {
+      upload_speed?: number
+      download_speed?: number
     }
-    speed_limit: {
-      upload_speed: number
-      download_speed: number
+    speed_limit?: {
+      upload_speed?: number
+      download_speed?: number
     }
-    ip_limit: number
+    user?: { hash?: string }
+    ip_limit?: number
   }
 }
