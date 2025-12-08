@@ -20,6 +20,13 @@ export class TrojanService {
     private readonly tServer: Repository<Server>
   ) {}
 
+  private async updateTrojan() {
+    await sleep()
+    runSpawnAndLog('update-trojan', process.argv[0], [
+      join(__dirname, '../../scripts/update-trojan.js')
+    ])
+  }
+
   async install() {
     const ip = await execSync('curl -sL -4 ip.sb')
     if (!ip) return apiUtil.error('本机IP获取失败')
@@ -33,18 +40,13 @@ export class TrojanService {
     if (entity.status !== statusEnum.NotInstalled) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
-    const userServerList = await this.tUserServer.find({
-      where: { serverId: entity.id }
-    })
-    const pwds = userServerList.map(e => e.password)
     // 配置 trojan
-    configTrojanJson(ip, entity.port, entity.domain, pwds)
-    const updateScript = join(__dirname, '../../scripts/update-trojan.ts')
+    configTrojanJson(ip, entity.port, entity.domain)
     runSpawnAndLog(
       `install-${entity.domain.replaceAll('.', '-')}`,
       'bash',
       [join(__dirname, '../../../bin/install.sh')],
-      () => to(execSync(`node ${updateScript}`))
+      () => this.updateTrojan()
     )
     entity.status = statusEnum.InstallationInProgress
     await this.tServer.save(entity)
@@ -65,12 +67,11 @@ export class TrojanService {
     if (![statusEnum.NotStarted, statusEnum.Started].includes(entity.status)) {
       return apiUtil.error(`当前服务器-${statusText[entity.status]}`)
     }
-    const updateScript = join(__dirname, '../../scripts/update-trojan.ts')
     runSpawnAndLog(
       `uninstall-${entity.domain.replaceAll('.', '-')}`,
       'bash',
-      [join(__dirname, '../../scripts/uninstall.js')],
-      () => to(execSync(`node ${updateScript}`))
+      [join(__dirname, '../../../bin/uninstall.sh')],
+      () => this.updateTrojan()
     )
     entity.status = statusEnum.Uninstalling
     await this.tServer.save(entity)

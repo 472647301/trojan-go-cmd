@@ -20,6 +20,40 @@ const orm = new DataSource({
   synchronize: false
 })
 
+async function addUserServerHash(db: DataSource, serverId: number) {
+  const userServerList = await db.manager.findBy(UserServer, {
+    serverId: serverId
+  })
+  for (const user of userServerList) {
+    const [err, res] = await to(
+      execSync(
+        `trojan-go -api set -add-profile -target-password ${user.password}`
+      )
+    )
+    if (res !== 'Done') {
+      logError('[AddUserServerHash]: ', err ?? res)
+      continue
+    }
+    try {
+      const info = await execSync(
+        `trojan-go -api get -target-password ${user.password}`
+      )
+      const item = JSON.parse(info) as ItemT
+      user.hash = item.user.hash
+      user.ipLimit = item.status.ip_limit
+      user.uploadTraffic = item.status.traffic_total.upload_traffic
+      user.downloadTraffic = item.status.traffic_total.download_traffic
+      user.downloadSpeed = item.status.speed_current.download_speed
+      user.uploadSpeed = item.status.speed_current.upload_speed
+      user.downloadLimit = item.status.speed_limit.download_speed
+      user.uploadLimit = item.status.speed_limit.upload_speed
+      await this.tUserServer.save(user)
+    } catch (e) {
+      logError('[AddUserServerHash]: ', e)
+    }
+  }
+}
+
 async function main() {
   logInfo('Task: update-trojan')
   const ip = await execSync('curl -sL -4 ip.sb')
@@ -42,6 +76,9 @@ async function main() {
     await db.manager.save(entity)
     return
   }
+  if (entity.status === statusEnum.InstallationInProgress) {
+    await addUserServerHash(db, entity.id)
+  }
   const userServerList = await db.manager.findBy(UserServer, {
     serverId: entity.id
   })
@@ -60,6 +97,8 @@ async function main() {
     ipLimit += item.status.ip_limit
     uploadTraffic += item.status.traffic_total.upload_traffic
     downloadTraffic += item.status.traffic_total.download_traffic
+    if (entity.status === statusEnum.InstallationInProgress) continue
+    // addUserServerHash 已更新
     const userServer = userServerList.find(e => {
       return e.hash === item.user.hash
     })
