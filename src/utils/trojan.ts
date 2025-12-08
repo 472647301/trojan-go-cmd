@@ -14,7 +14,7 @@ export async function stopNginx(bt: boolean) {
 export async function fetchTrojanStatus(port: number): Promise<statusEnum> {
   const [, tCmd] = await to(execSync('command -v trojan-go'))
   if (!tCmd) return statusEnum.NotInstalled
-  const res = await execSync(`ss -ntlp | grep ${port} | grep trojan-go`)
+  const [, res] = await to(execSync(`ss -ntlp | grep ${port} | grep trojan-go`))
   return res ? statusEnum.Started : statusEnum.NotStarted
 }
 

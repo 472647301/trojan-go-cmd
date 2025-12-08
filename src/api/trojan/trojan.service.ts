@@ -52,7 +52,7 @@ export class TrojanService {
       `install-${entity.domain.replaceAll('.', '-')}`,
       'bash',
       [join(__dirname, '../../../bin/install.sh')],
-      () => this.updateTrojan()
+      () => this.updateTrojan(true)
     )
     entity.status = statusEnum.InstallationInProgress
     await this.tServer.save(entity)

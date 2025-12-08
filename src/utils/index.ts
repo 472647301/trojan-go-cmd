@@ -1,4 +1,4 @@
-import { exec, spawn, spawnSync } from 'child_process'
+import { exec, spawn } from 'child_process'
 import dayjs from 'dayjs'
 import { Request } from 'express'
 import { closeSync, openSync } from 'fs'
@@ -79,18 +79,20 @@ export function runSpawnAndLog(
     'a'
   )
 
-  logInfo(`Spawning child process and redirecting output to log files...`)
+  logInfo(
+    `[${name}]: Spawning child process and redirecting output to log files...`
+  )
   const child = spawn(command, args, {
     // Pipes stdin to parent, stdout to stdoutLog FD, stderr to stderrLog FD
     stdio: ['inherit', stdoutLog, stderrLog]
   })
 
   child.on('error', err => {
-    logError('Failed to start child process:', err)
+    logError(`[${name}]: Failed to start child process:`, err)
   })
 
   child.on('close', code => {
-    logInfo(`Child process exited with code ${code}.`)
+    logInfo(`[${name}]: Child process exited with code ${code}.`)
     // Close file descriptors when done
     closeSync(stdoutLog)
     closeSync(stderrLog)

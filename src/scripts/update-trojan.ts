@@ -24,10 +24,10 @@ async function addUserServerHash(db: DataSource, serverId: number) {
   const userServerList = await db.manager.findBy(UserServer, {
     serverId: serverId
   })
-  for (const user of userServerList) {
+  for (const userServer of userServerList) {
     const [err, res] = await to(
       execSync(
-        `trojan-go -api set -add-profile -target-password ${user.password}`
+        `trojan-go -api set -add-profile -target-password ${userServer.password}`
       )
     )
     if (res !== 'Done') {
@@ -36,18 +36,19 @@ async function addUserServerHash(db: DataSource, serverId: number) {
     }
     try {
       const info = await execSync(
-        `trojan-go -api get -target-password ${user.password}`
+        `trojan-go -api get -target-password ${userServer.password}`
       )
       const item = JSON.parse(info) as ItemT
-      user.hash = item.status?.user?.hash ?? null
-      user.ipLimit = item.status?.ip_limit ?? 0
-      user.uploadTraffic = item.status?.traffic_total?.upload_traffic ?? 0
-      user.downloadTraffic = item.status?.traffic_total?.download_traffic ?? 0
-      user.downloadSpeed = item.status?.speed_current?.download_speed ?? 0
-      user.uploadSpeed = item.status?.speed_current?.upload_speed ?? 0
-      user.downloadLimit = item.status?.speed_limit?.download_speed ?? 0
-      user.uploadLimit = item.status?.speed_limit?.upload_speed ?? 0
-      await this.tUserServer.save(user)
+      userServer.hash = item.status?.user?.hash ?? null
+      userServer.ipLimit = item.status?.ip_limit ?? 0
+      userServer.uploadTraffic = item.status?.traffic_total?.upload_traffic ?? 0
+      userServer.downloadTraffic =
+        item.status?.traffic_total?.download_traffic ?? 0
+      userServer.downloadSpeed = item.status?.speed_current?.download_speed ?? 0
+      userServer.uploadSpeed = item.status?.speed_current?.upload_speed ?? 0
+      userServer.downloadLimit = item.status?.speed_limit?.download_speed ?? 0
+      userServer.uploadLimit = item.status?.speed_limit?.upload_speed ?? 0
+      await db.manager.save(userServer)
     } catch (e) {
       logError('[AddUserServerHash]: ', e)
     }
