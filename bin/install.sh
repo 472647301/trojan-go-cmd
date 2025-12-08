@@ -40,7 +40,7 @@ colorEcho() {
 checkSystem() {
     result=$(id | awk '{print $1}')
     if [[ $result != "uid=0(root)" ]]; then
-        echo -e " ${RED}请以root身份执行该脚本${PLAIN}"
+        echo -e "${RED}请以root身份执行该脚本${PLAIN}"
         exit 1
     fi
 
@@ -48,7 +48,7 @@ checkSystem() {
     if [[ "$?" != "0" ]]; then
         res=`which apt-get 2>/dev/null`
         if [[ "$?" != "0" ]]; then
-            echo -e " ${RED}不受支持的Linux系统${PLAIN}"
+            echo -e "${RED}不受支持的Linux系统${PLAIN}"
             exit 1
         fi
         PMT="apt-get"
@@ -63,7 +63,7 @@ checkSystem() {
     fi
     res=`which systemctl 2>/dev/null`
     if [[ "$?" != "0" ]]; then
-        echo -e " ${RED}系统版本过低，请升级到最新版本${PLAIN}"
+        echo -e "${RED}系统版本过低，请升级到最新版本${PLAIN}"
         exit 1
     fi
 }
@@ -158,14 +158,14 @@ getData() {
     line1=`grep -n 'websocket' $CONFIG_JSON  | head -n1 | cut -d: -f1`
     line11=`expr $line1 + 1`
     ws=`sed -n "${line11}p" $CONFIG_JSON | cut -d: -f2 | tr -d \",' '`
-    echo -e "   IP：$IP"
-    echo -e "   伪装域名/主机名(host)/SNI/peer名称：$domain"
-    echo -e "   端口(port)：$port"
-    echo -e "   密码(password)：$password"
+    echo -e "IP：$IP"
+    echo -e "伪装域名/主机名(host)/SNI/peer名称：$domain"
+    echo -e "端口(port)：$port"
+    echo -e "密码(password)：$password"
     if [[ $ws = "true" ]]; then
-        echo -e "   websocket：true"
+        echo -e "websocket：true"
         wspath=`grep path $CONFIG_FILE | cut -d: -f2 | tr -d \",' '`
-        echo -e "   ws路径(ws path)：${wspath}"
+        echo -e "ws路径(ws path)：${wspath}"
     fi
     PORT="${port}"
     DOMAIN="${domain}"
@@ -175,7 +175,7 @@ getData() {
 
 installNginx() {
     echo ""
-    colorEcho $BLUE " 安装nginx..."
+    colorEcho $BLUE "安装nginx..."
     if [[ "$BT" = "false" ]]; then
         if [[ "$PMT" = "yum" ]]; then
             $CMD_INSTALL epel-release
@@ -191,14 +191,14 @@ module_hotfixes=true' > /etc/yum.repos.d/nginx.repo
         fi
         $CMD_INSTALL nginx
         if [[ "$?" != "0" ]]; then
-            colorEcho $RED " Nginx安装失败，请到 https://hijk.art 反馈"
+            colorEcho $RED "Nginx安装失败，请到 https://hijk.art 反馈"
             exit 1
         fi
         systemctl enable nginx
     else
         res=`which nginx 2>/dev/null`
         if [[ "$?" != "0" ]]; then
-            colorEcho $RED " 您安装了宝塔，请在宝塔后台安装nginx后再运行本脚本"
+            colorEcho $RED "您安装了宝塔，请在宝塔后台安装nginx后再运行本脚本"
             exit 1
         fi
     fi
@@ -254,7 +254,7 @@ getCert() {
             ~/.acme.sh/acme.sh --issue -d $DOMAIN --keylength ec-256 --pre-hook "nginx -s stop || { echo -n ''; }" --post-hook "nginx -c /www/server/nginx/conf/nginx.conf || { echo -n ''; }" --standalone --force
         fi
         [[ -f ~/.acme.sh/${DOMAIN}_ecc/ca.cer ]] || {
-            colorEcho $RED " 获取证书失败，请复制上面的红色文字到 https://hijk.art 反馈"
+            colorEcho $RED "获取证书失败，请复制上面的红色文字到 https://hijk.art 反馈"
             exit 1
         }
         CERT_FILE="/etc/trojan-go/${DOMAIN}.pem"
@@ -264,7 +264,7 @@ getCert() {
             --fullchain-file $CERT_FILE \
             --reloadcmd     "service nginx force-reload"
         [[ -f $CERT_FILE && -f $KEY_FILE ]] || {
-            colorEcho $RED " 获取证书失败，请到 https://hijk.art 反馈"
+            colorEcho $RED "获取证书失败，请到 https://hijk.art 反馈"
             exit 1
         }
     else
@@ -335,10 +335,16 @@ EOF
     if [[ "$PROXY_URL" = "" ]]; then
         cat > $NGINX_CONF_PATH${DOMAIN}.conf<<-EOF
 server {
-    listen 80;
-    listen [::]:80;
+    listen 443 ssl;
     server_name ${DOMAIN};
     root /usr/share/nginx/html;
+
+    ssl_certificate ${CERT_FILE};
+    ssl_certificate_key ${KEY_FILE};
+    # 添加 TLS 优化参数 (安全性和性能) [2]
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers 'TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256';
+    ssl_prefer_server_ciphers on;
 
     $ROBOT_CONFIG
 }
@@ -385,7 +391,7 @@ installTrojan() {
     systemctl enable trojan-go
     rm -rf /tmp/${ZIP_FILE}
 
-    colorEcho $BLUE " trojan-go安装成功！"
+    colorEcho $BLUE "trojan-go安装成功！"
 }
 
 configTrojan() {
@@ -515,7 +521,7 @@ install() {
     fi
     res=`which unzip 2>/dev/null`
     if [[ $? -ne 0 ]]; then
-        echo -e " ${RED}unzip安装失败，请检查网络${PLAIN}"
+        echo -e "${RED}unzip安装失败，请检查网络${PLAIN}"
         exit 1
     fi
 
@@ -524,7 +530,7 @@ install() {
     getCert
     configNginx
 
-    echo " 安装trojan-go..."
+    echo "安装trojan-go..."
     getVersion
     downloadFile
     installTrojan
@@ -550,9 +556,9 @@ start() {
     port=`grep local_port $CONFIG_FILE|cut -d: -f2| tr -d \",' '`
     res=`ss -ntlp| grep ${port} | grep trojan-go`
     if [[ "$res" = "" ]]; then
-        colorEcho $RED " trojan-go启动失败，请检查端口是否被占用！"
+        colorEcho $RED "trojan-go启动失败，请检查端口是否被占用！"
     else
-        colorEcho $BLUE " trojan-go启动成功"
+        colorEcho $BLUE "trojan-go启动成功"
     fi
 }
 
@@ -572,19 +578,19 @@ showInfo() {
     line11=`expr $line1 + 1`
     ws=`sed -n "${line11}p" $CONFIG_FILE | cut -d: -f2 | tr -d \",' '`
     echo ""
-    echo -n " trojan-go运行状态："
+    echo -n "trojan-go运行状态："
     statusText
     echo ""
-    echo -e " ${BLUE}trojan-go配置文件: ${PLAIN} ${RED}${CONFIG_FILE}${PLAIN}"
-    echo -e " ${BLUE}trojan-go配置信息：${PLAIN}"
-    echo -e "   IP：${RED}$IP${PLAIN}"
-    echo -e "   伪装域名/主机名(host)/SNI/peer名称：${RED}$domain${PLAIN}"
-    echo -e "   端口(port)：${RED}$port${PLAIN}"
-    echo -e "   密码(password)：${RED}$password${PLAIN}"
+    echo -e "${BLUE}trojan-go配置文件: ${PLAIN} ${RED}${CONFIG_FILE}${PLAIN}"
+    echo -e "${BLUE}trojan-go配置信息：${PLAIN}"
+    echo -e "IP：${RED}$IP${PLAIN}"
+    echo -e "伪装域名/主机名(host)/SNI/peer名称：${RED}$domain${PLAIN}"
+    echo -e "端口(port)：${RED}$port${PLAIN}"
+    echo -e "密码(password)：${RED}$password${PLAIN}"
     if [[ $ws = "true" ]]; then
-        echo -e "   websocket：${RED}true${PLAIN}"
+        echo -e "websocket：${RED}true${PLAIN}"
         wspath=`grep path $CONFIG_FILE | cut -d: -f2 | tr -d \",' '`
-        echo -e "   ws路径(ws path)：${RED}${wspath}${PLAIN}"
+        echo -e "ws路径(ws path)：${RED}${wspath}${PLAIN}"
     fi
     echo ""
 }
