@@ -1,6 +1,6 @@
 import { AppModule } from './app'
 import { NestFactory } from '@nestjs/core'
-import { Logger, ValidationPipe } from '@nestjs/common'
+import { ValidationPipe } from '@nestjs/common'
 import { ExceptionFilter } from './middleware/exception.filter'
 import { TransformInterceptor } from './middleware/transform.interceptor'
 import { NestExpressApplication } from '@nestjs/platform-express'
@@ -13,20 +13,9 @@ import * as dotenv from 'dotenv'
 import * as Log4js from 'log4js'
 import helmet from 'helmet'
 
-const log = new Logger('Nest', { timestamp: true })
-
 dotenv.config({ path: ['.env.local', '.env'] })
 
 Log4js.configure(log4jsConfigure())
-
-const envKeys = [
-  'PORT',
-  'ORM_HOST',
-  'ORM_PORT',
-  'ORM_USERNAME',
-  'ORM_PASSWORD',
-  'ORM_DATABASE'
-]
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -60,9 +49,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, builder.build())
   SwaggerModule.setup('api/docs', app, document)
 
-  await app.listen(configService.get('PORT') || 8086, () => {
-    envKeys.forEach(key => log.log(`${key}=${configService.get(key)}`))
-  })
+  await app.listen(configService.get('PORT') || 8086)
 }
 
 bootstrap()
