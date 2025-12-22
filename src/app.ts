@@ -6,6 +6,7 @@ import { ScheduleModule } from '@nestjs/schedule'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { join } from 'path'
 import { DatabaseLogger } from './utils/logger'
+import { TaskModule } from './schedule/task.module'
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { DatabaseLogger } from './utils/logger'
       inject: [ConfigService]
     }),
     TrojanModule,
+    TaskModule,
     LogModule
   ],
   controllers: [],

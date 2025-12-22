@@ -4,7 +4,7 @@ import { join } from 'path'
 import { runSpawnAndLog } from 'src/utils'
 
 @Injectable()
-export class TaskTrojanService {
+export class TaskService {
   // 每 5 分钟
   @Cron(CronExpression.EVERY_5_MINUTES)
   async updateInfo() {
