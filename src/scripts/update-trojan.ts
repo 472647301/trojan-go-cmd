@@ -78,6 +78,7 @@ async function main() {
     return
   }
   if (entity.status === statusEnum.InstallationInProgress) {
+    entity.startTime = new Date()
     await addUserServerHash(db, entity.id)
   }
   const userServerList = await db.manager.findBy(UserServer, {
