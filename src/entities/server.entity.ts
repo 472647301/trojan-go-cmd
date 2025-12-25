@@ -87,7 +87,7 @@ export class Server {
   })
   enable: number
 
-  @Column('date', {
+  @Column('datetime', {
     name: 'start_time',
     comment: '启动时间',
     nullable: true
