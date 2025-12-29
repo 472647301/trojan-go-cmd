@@ -25,8 +25,3 @@ export class TrojanLimitDto {
   @IsNotEmpty()
   download: number
 }
-
-export class TrojanItem {
-  id: number
-  status: number
-}

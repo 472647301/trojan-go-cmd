@@ -1,6 +1,6 @@
 import { Body, Controller, Param, Post } from '@nestjs/common'
 import { TrojanService } from './trojan.service'
-import { TrojanItem, TrojanLimitDto, TrojanUserDto } from './trojan.dto'
+import { TrojanLimitDto, TrojanUserDto } from './trojan.dto'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ApiResult } from 'src/decorators'
 
@@ -11,43 +11,43 @@ export class TrojanController {
 
   @Post('install')
   @ApiOperation({ summary: '安装' })
-  @ApiResult({ type: TrojanItem })
+  @ApiResult({ type: String })
   install() {
     return this.service.install()
   }
 
   @Post('uninstall')
   @ApiOperation({ summary: '卸载' })
-  @ApiResult({ type: TrojanItem })
+  @ApiResult({ type: String })
   uninstall() {
     return this.service.uninstall()
   }
 
   @Post('start')
   @ApiOperation({ summary: '启动' })
-  @ApiResult({ type: TrojanItem })
+  @ApiResult({ type: String })
   start() {
     return this.service.start()
   }
 
   @Post('stop')
   @ApiOperation({ summary: '停止' })
-  @ApiResult({ type: TrojanItem })
+  @ApiResult({ type: String })
   stop() {
     return this.service.stop()
   }
 
-  @Post('user/:id')
+  @Post('user/:password')
   @ApiOperation({ summary: '调整用户' })
-  @ApiResult({ type: TrojanItem })
-  user(@Param('id') id: string, @Body() body: TrojanUserDto) {
-    return this.service.user(id, body)
+  @ApiResult({ type: String })
+  user(@Param('password') password: string, @Body() body: TrojanUserDto) {
+    return this.service.user(password, body)
   }
 
-  @Post('limit/:id')
+  @Post('limit/:password')
   @ApiOperation({ summary: '限制用户' })
-  @ApiResult({ type: TrojanItem })
-  limit(@Param('id') id: string, @Body() body: TrojanLimitDto) {
-    return this.service.limit(id, body)
+  @ApiResult({ type: String })
+  limit(@Param('password') password: string, @Body() body: TrojanLimitDto) {
+    return this.service.limit(password, body)
   }
 }
