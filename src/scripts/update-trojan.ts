@@ -20,41 +20,6 @@ const orm = new DataSource({
   synchronize: false
 })
 
-async function addUserServerHash(db: DataSource, serverId: number) {
-  const userServerList = await db.manager.findBy(UserServer, {
-    serverId: serverId
-  })
-  for (const userServer of userServerList) {
-    const [err, res] = await to(
-      execSync(
-        `trojan-go -api set -add-profile -target-password ${userServer.password}`
-      )
-    )
-    if (res !== 'Done') {
-      logError('[AddUserServerHash]: ', err ?? res)
-      continue
-    }
-    try {
-      const info = await execSync(
-        `trojan-go -api get -target-password ${userServer.password}`
-      )
-      const item = JSON.parse(info) as ItemT
-      userServer.hash = item.status?.user?.hash ?? null
-      userServer.ipLimit = item.status?.ip_limit ?? 0
-      userServer.uploadTraffic = item.status?.traffic_total?.upload_traffic ?? 0
-      userServer.downloadTraffic =
-        item.status?.traffic_total?.download_traffic ?? 0
-      userServer.downloadSpeed = item.status?.speed_current?.download_speed ?? 0
-      userServer.uploadSpeed = item.status?.speed_current?.upload_speed ?? 0
-      userServer.downloadLimit = item.status?.speed_limit?.download_speed ?? 0
-      userServer.uploadLimit = item.status?.speed_limit?.upload_speed ?? 0
-      await db.manager.save(userServer)
-    } catch (e) {
-      logError('[AddUserServerHash]: ', e)
-    }
-  }
-}
-
 async function main() {
   logInfo('Task: update-trojan')
   const ip = await execSync('curl -sL -4 ip.sb')
@@ -79,48 +44,51 @@ async function main() {
   }
   if (entity.status === statusEnum.InstallationInProgress) {
     entity.startTime = new Date()
-    await addUserServerHash(db, entity.id)
   }
+  const newUserServerList: UserServer[] = []
   const userServerList = await db.manager.findBy(UserServer, {
     serverId: entity.id
   })
-  const [, text] = await to(
-    execSync('trojan-go -api-addr 127.0.0.1:10000 -api list')
-  )
-  if (!text) {
-    logError('用户列表读取失败')
-    return
-  }
   let ipLimit = 0
   let uploadTraffic = 0
   let downloadTraffic = 0
-  const list = JSON.parse(text) as ItemT[]
-  for (const item of list) {
+  for (const uServer of userServerList) {
+    if (!uServer.password) continue
+    if (entity.status === statusEnum.InstallationInProgress) {
+      await to(
+        execSync(
+          `trojan-go -api set -add-profile -target-password ${uServer.password}`
+        )
+      )
+    }
+    const [, info] = await to(
+      execSync(`trojan-go -api get -target-password ${uServer.password}`)
+    )
+    if (!info) continue
+    const item = JSON.parse(info) as ItemT
     ipLimit += item.status?.ip_limit ?? 0
     uploadTraffic += item.status?.traffic_total?.upload_traffic ?? 0
     downloadTraffic += item.status?.traffic_total?.download_traffic ?? 0
-    if (entity.status === statusEnum.InstallationInProgress) continue
-    // addUserServerHash 已更新
-    const userServer = userServerList.find(e => {
-      return e.hash === item.status?.user?.hash
-    })
-    if (!userServer) continue
-    userServer.ipLimit = item.status?.ip_limit ?? 0
-    userServer.uploadTraffic = item.status?.traffic_total?.upload_traffic ?? 0
-    userServer.downloadTraffic =
-      item.status?.traffic_total?.download_traffic ?? 0
-    userServer.downloadSpeed = item.status?.speed_current?.download_speed ?? 0
-    userServer.uploadSpeed = item.status?.speed_current?.upload_speed ?? 0
-    userServer.downloadLimit = item.status?.speed_limit?.download_speed ?? 0
-    userServer.uploadLimit = item.status?.speed_limit?.upload_speed ?? 0
-    await db.manager.save(userServer)
+
+    uServer.ipLimit = item.status?.ip_limit ?? 0
+    uServer.uploadTraffic = item.status?.traffic_total?.upload_traffic ?? 0
+    uServer.downloadTraffic = item.status?.traffic_total?.download_traffic ?? 0
+    uServer.downloadSpeed = item.status?.speed_current?.download_speed ?? 0
+    uServer.uploadSpeed = item.status?.speed_current?.upload_speed ?? 0
+    uServer.downloadLimit = item.status?.speed_limit?.download_speed ?? 0
+    uServer.uploadLimit = item.status?.speed_limit?.upload_speed ?? 0
+    uServer.hash = item.status?.user?.hash ?? null
+    newUserServerList.push(uServer)
   }
+  entity.status = status
   entity.ipLimit = ipLimit
   entity.uploadTraffic = uploadTraffic
   entity.downloadTraffic = downloadTraffic
-  entity.online = list.length
-  entity.status = status
-  await db.manager.save(entity)
+  entity.online = newUserServerList.length
+  await Promise.all([
+    db.manager.save(entity),
+    db.manager.save(newUserServerList)
+  ])
 }
 
 main().finally(() => {
