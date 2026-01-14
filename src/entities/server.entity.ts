@@ -24,14 +24,14 @@ export class Server {
   })
   ipLimit: number
 
-  @Column('int', {
+  @Column('bigint', {
     name: 'upload_traffic',
     comment: '总上传流量',
     default: () => '0'
   })
   uploadTraffic: number
 
-  @Column('int', {
+  @Column('bigint', {
     name: 'download_traffic',
     comment: '总下载流量',
     default: () => '0'
