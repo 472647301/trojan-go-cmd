@@ -10,13 +10,15 @@ import { TrojanLimitDto, TrojanUserDto, UserAction } from './trojan.dto'
 import { configTrojanJson, fetchTrojanStatus } from 'src/utils/trojan'
 import { startNginx, stopNginx } from 'src/utils/trojan'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { TaskService } from 'src/schedule/task.service'
 
 @Injectable()
 export class TrojanService {
   constructor(
+    private readonly taskService: TaskService,
     @InjectRepository(Server)
     private readonly tServer: Repository<Server>
-  ) {}
+  ) { }
 
   private async updateTrojan(isInstall?: boolean) {
     if (isInstall && existsSync('/usr/share/nginx/html/index.html')) {
@@ -163,6 +165,17 @@ export class TrojanService {
     if (res !== 'Done') {
       return apiUtil.error(res)
     }
+    return apiUtil.data('success')
+  }
+
+  async refreshCronJob() {
+    const ip = await execSync('curl -sL -4 ip.sb')
+    if (!ip) return apiUtil.error('本机IP获取失败')
+    const entity = await this.tServer.findOneBy({
+      ip: ip
+    })
+    if (!entity) return apiUtil.error('资源不存在')
+    await this.taskService.refreshCronJob(entity.id)
     return apiUtil.data('success')
   }
 }

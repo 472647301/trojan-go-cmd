@@ -7,7 +7,7 @@ import { ApiResult } from 'src/decorators'
 @ApiTags('trojan')
 @Controller('trojan')
 export class TrojanController {
-  constructor(private readonly service: TrojanService) {}
+  constructor(private readonly service: TrojanService) { }
 
   @Post('install')
   @ApiOperation({ summary: '安装' })
@@ -49,5 +49,12 @@ export class TrojanController {
   @ApiResult({ type: String })
   limit(@Param('password') password: string, @Body() body: TrojanLimitDto) {
     return this.service.limit(password, body)
+  }
+
+  @Post('refresh/cronjob')
+  @ApiOperation({ summary: '刷新定时任务' })
+  @ApiResult({ type: String })
+  refreshCronJob() {
+    return this.service.refreshCronJob()
   }
 }
